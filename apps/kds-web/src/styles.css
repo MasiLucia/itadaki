@@ -1,0 +1,7 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; min-height: 100%; }
+body {
+  background: var(--itadaki-ink);
+  font-family: var(--itadaki-font-body);
+  -webkit-font-smoothing: antialiased;
+}

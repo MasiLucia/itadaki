@@ -1,0 +1,140 @@
+/* Sits above the cart bar every screen has at the bottom. */
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: var(--itadaki-surface-raised);
+  box-shadow: var(--itadaki-shadow-raised);
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+
+.fab.waiting {
+  background: var(--itadaki-accent);
+}
+
+/* A dot, not a number: the table cares that someone is coming, not how many
+   requests are open. */
+.fab-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--itadaki-status-ready);
+  border: 2px solid var(--itadaki-surface-raised);
+  animation: itadaki-pulse-dot 1.8s ease-in-out infinite;
+}
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+  background: oklch(24% 0.02 40 / 0.35);
+}
+
+.sheet {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  z-index: 42;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem;
+  border-radius: var(--itadaki-radius-panel);
+  background: var(--itadaki-surface-raised);
+  box-shadow: var(--itadaki-shadow-panel);
+  animation: itadaki-slide-in 0.2s ease;
+}
+
+.sheet-title {
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--itadaki-ink-strong);
+  margin: 0 0 0.3rem;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-chip);
+  background: var(--itadaki-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 52px;
+}
+
+/* Already asked reads as done, not as broken. */
+.option:disabled {
+  border-color: var(--itadaki-status-ready);
+  background: var(--itadaki-status-ready-bg);
+  cursor: default;
+}
+
+.option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.option-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--itadaki-ink-strong);
+}
+
+.option-hint {
+  font-size: 0.76rem;
+  color: var(--itadaki-ink-subtle);
+}
+
+.option-tick {
+  flex-shrink: 0;
+  color: var(--itadaki-status-ready-fg);
+  font-weight: 700;
+}
+
+.sheet-error {
+  margin: 0.2rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--itadaki-radius-chip);
+  background: var(--itadaki-accent-soft);
+  color: var(--itadaki-ink-strong);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.cancel {
+  margin-top: 0.3rem;
+  border: none;
+  background: none;
+  padding: 0.6rem;
+  font-family: inherit;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-subtle);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet { animation: none; }
+  .fab-dot { animation: none; }
+}

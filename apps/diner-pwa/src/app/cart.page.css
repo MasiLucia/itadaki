@@ -1,0 +1,322 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--itadaki-surface);
+}
+
+.pad {
+  padding: 20px 18px 8px;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--itadaki-ink-faint);
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.title {
+  font-family: var(--itadaki-font-display);
+  font-weight: 800;
+  font-size: 1.45rem;
+  color: var(--itadaki-ink-strong);
+  margin: 0.25rem 0 0;
+  letter-spacing: -0.4px;
+}
+
+.live {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--itadaki-status-ready-fg);
+  font-weight: 600;
+  margin: 0.3rem 0 0;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--itadaki-live);
+  animation: itadaki-pulse-dot 1.6s ease-in-out infinite;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.15rem;
+}
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.group-name {
+  font-weight: 700;
+  font-size: 0.87rem;
+  color: var(--itadaki-ink-strong);
+  flex: 1;
+}
+
+.group-name em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--itadaki-ink-subtle);
+  font-size: 0.8rem;
+}
+
+.group-total {
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--itadaki-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.group-empty {
+  font-size: 0.78rem;
+  color: var(--itadaki-ink-faint);
+  font-style: italic;
+  margin: 0 0 0.4rem 2.1rem;
+}
+
+.list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem 18px 14rem;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: var(--itadaki-surface-raised);
+  border-radius: var(--itadaki-radius-tile);
+  padding: 0.85rem 0.9rem;
+}
+
+.row-main {
+  min-width: 0;
+}
+
+.row-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--itadaki-ink-strong);
+  margin: 0;
+}
+
+.row-mods {
+  font-size: 0.75rem;
+  color: var(--itadaki-ink-subtle);
+  margin: 0.2rem 0 0;
+}
+
+.row-note {
+  font-size: 0.75rem;
+  color: var(--itadaki-accent);
+  font-style: italic;
+  margin: 0.2rem 0 0;
+}
+
+.row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.row-total {
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--itadaki-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--itadaki-surface-sunken);
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.25rem;
+}
+
+.step {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: white;
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  color: var(--itadaki-ink);
+}
+
+.qty {
+  font-weight: 700;
+  min-width: 18px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--itadaki-ink-subtle);
+}
+
+.link {
+  color: var(--itadaki-accent);
+  font-weight: 600;
+}
+
+.foot {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.9rem 18px calc(0.9rem + env(safe-area-inset-bottom));
+  background: var(--itadaki-surface);
+  border-top: 1px solid var(--itadaki-border);
+}
+
+.totals {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: var(--itadaki-ink-subtle);
+  margin-bottom: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.total-line {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--itadaki-ink-strong);
+  margin-bottom: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cta {
+  width: 100%;
+  background: var(--itadaki-accent);
+  color: white;
+  border: none;
+  border-radius: var(--itadaki-radius-pill);
+  padding: 1rem;
+  font-family: var(--itadaki-font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: var(--itadaki-shadow-cta-accent);
+}
+
+.cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.sent-note {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--itadaki-status-ready-fg);
+  background: var(--itadaki-status-ready-bg);
+  border-radius: var(--itadaki-radius-chip);
+  padding: 0.6rem;
+  margin: 0 0 0.6rem;
+}
+
+.error-note {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--itadaki-accent);
+  margin: 0.5rem 0 0;
+}
+
+.cta-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  min-height: 48px;
+}
+
+.phase-note {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--itadaki-ink-faint);
+  margin: 0.5rem 0 0;
+}
+
+/* Amber, not red: the order is safe, it just has not gone out yet. */
+.queued-note {
+  margin: 0 0 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--itadaki-radius-chip);
+  background: oklch(93% 0.07 85);
+  color: oklch(35% 0.09 60);
+  font-size: 0.83rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.line-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Quiet next to the stepper: removing is deliberate, not the default action. */
+.remove {
+  border: none;
+  background: none;
+  padding: 0.35rem 0.4rem;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-subtle);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.foot-link {
+  display: block;
+  margin-top: 0.6rem;
+  text-align: center;
+  font-size: 0.83rem;
+}

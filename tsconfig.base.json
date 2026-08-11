@@ -1,0 +1,50 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@itadaki/shared/domain": ["libs/shared/domain/src/index.ts"],
+      "@itadaki/shared/ui-tokens": ["libs/shared/ui-tokens/src/index.ts"],
+      "@itadaki/shared/offline": ["libs/shared/offline/src/index.ts"],
+      "@itadaki/shared/i18n": ["libs/shared/i18n/src/index.ts"],
+      "@itadaki/shared/persistence": ["libs/shared/persistence/src/index.ts"],
+      "@itadaki/shared/ui-image-editor": ["libs/shared/ui-image-editor/src/index.ts"],
+      "@itadaki/shared/ui-auth": ["libs/shared/ui-auth/src/index.ts"],
+      "@itadaki/catalog/domain": ["libs/catalog/domain/src/index.ts"],
+      "@itadaki/catalog/application": ["libs/catalog/application/src/index.ts"],
+      "@itadaki/catalog/application/server": ["libs/catalog/application/src/server.ts"],
+      "@itadaki/catalog/infra": ["libs/catalog/infra/src/index.ts"],
+      "@itadaki/ordering/domain": ["libs/ordering/domain/src/index.ts"],
+      "@itadaki/ordering/application": ["libs/ordering/application/src/index.ts"],
+      "@itadaki/ordering/infra": ["libs/ordering/infra/src/index.ts"],
+      "@itadaki/billing/domain": ["libs/billing/domain/src/index.ts"],
+      "@itadaki/billing/application": ["libs/billing/application/src/index.ts"],
+      "@itadaki/billing/infra": ["libs/billing/infra/src/index.ts"],
+      "@itadaki/analytics/domain": ["libs/analytics/domain/src/index.ts"],
+      "@itadaki/identity/domain": ["libs/identity/domain/src/index.ts"],
+      "@itadaki/identity/application": ["libs/identity/application/src/index.ts"],
+      "@itadaki/identity/infra": ["libs/identity/infra/src/index.ts"]
+    }
+  },
+  "include": ["libs/**/*.ts"],
+  // Browser-only libraries are typechecked by the app that consumes them,
+  // where the DOM lib is available.
+  "exclude": [
+    "node_modules",
+    "dist",
+    "libs/shared/ui-image-editor/**",
+    "libs/shared/ui-auth/**"
+  ]
+}

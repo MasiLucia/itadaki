@@ -1,0 +1,485 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--itadaki-surface);
+}
+
+.pad {
+  padding: 20px 18px 12px;
+  flex-shrink: 0;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--itadaki-ink-faint);
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.title {
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 1.65rem;
+  color: var(--itadaki-ink-strong);
+  margin: 0.2rem 0 1rem;
+  letter-spacing: -0.5px;
+  text-wrap: balance;
+}
+
+.search-row {
+  margin-bottom: 0.75rem;
+}
+
+.search {
+  width: 100%;
+  border: 1px solid var(--itadaki-border);
+  background: var(--itadaki-surface-raised);
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.7rem 1rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--itadaki-ink);
+}
+
+.chips {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+/* Categories pick one; diet filters stack. Separating them with a rule and a
+   label stops the second row reading as more of the first. */
+.diets {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--itadaki-border);
+}
+
+.diets-label {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--itadaki-ink-faint);
+}
+
+.diet-list {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 0.15rem;
+}
+
+.diet-list::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.55rem 1rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--itadaki-surface-raised);
+  color: var(--itadaki-ink);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--itadaki-accent);
+  color: white;
+}
+
+/* Squared-off and box-led, so it never gets mistaken for a category pill. */
+.chip-diet {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1.5px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-chip);
+  padding: 0.42rem 0.75rem 0.42rem 0.55rem;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-muted);
+  cursor: pointer;
+  min-height: 36px;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.diet-box {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--itadaki-border-dashed);
+  border-radius: 4px;
+  background: var(--itadaki-surface-raised);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.diet-tick {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: white;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* Drawn on selection rather than merely revealed: the stroke animating in is
+     what makes an added filter feel additive. */
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+  transition: stroke-dashoffset 0.2s ease;
+}
+
+.chip-diet[aria-checked='true'] {
+  border-color: var(--itadaki-accent);
+  background: var(--itadaki-accent-soft);
+  color: var(--itadaki-ink-strong);
+}
+
+.chip-diet[aria-checked='true'] .diet-box {
+  border-color: var(--itadaki-accent);
+  background: var(--itadaki-accent);
+}
+
+.chip-diet[aria-checked='true'] .diet-tick {
+  stroke-dashoffset: 0;
+}
+
+@media (hover: hover) {
+  .chip-diet:hover {
+    border-color: var(--itadaki-ink-subtle);
+  }
+}
+
+.diet-clear {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 0.42rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--itadaki-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  min-height: 36px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diet-tick {
+    transition: none;
+  }
+}
+
+.carte {
+  flex: 1;
+  padding: 0.5rem 18px 7rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.section {
+  margin-bottom: 2.25rem;
+}
+
+/* A named section with a rule is what makes a list read as a carte. */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 0.9rem;
+}
+
+.section-name {
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--itadaki-ink-strong);
+  margin: 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.section-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--itadaki-border);
+}
+
+.list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-content: start;
+}
+
+/* On a tablet or desktop the carte becomes a gallery. */
+@media (min-width: 640px) {
+  .list {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--itadaki-surface-raised);
+  border-radius: var(--itadaki-radius-card);
+  overflow: hidden;
+  box-shadow: var(--itadaki-shadow-card);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+/* The photo and text open the dish; the button below adds it. A button cannot
+   nest inside a link, so the card is a container rather than one anchor. */
+.card-link {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+}
+
+@media (hover: hover) {
+  .card:hover {
+    box-shadow: 0 6px 20px oklch(24% 0.02 40 / 0.12);
+    transform: translateY(-2px);
+  }
+}
+
+.photo-pic {
+  display: block;
+  width: 100%;
+}
+
+/* Wide and shallow: enough to recognise the dish without pushing the price and
+   the add button off a phone screen. */
+.photo {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  object-fit: cover;
+  display: block;
+  background-size: cover;
+  background-position: center;
+}
+
+.placeholder {
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 2rem;
+  color: oklch(38% 0.06 33);
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(88% 0.05 33),
+    oklch(88% 0.05 33) 12px,
+    oklch(92% 0.04 33) 12px,
+    oklch(92% 0.04 33) 24px
+  );
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  /* The add button carries the bottom spacing now. */
+  padding: 0.95rem 1.05rem 0.85rem;
+  min-width: 0;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.85rem;
+}
+
+.card-name {
+  font-family: var(--itadaki-font-display);
+  font-weight: 600;
+  font-size: 1.02rem;
+  color: var(--itadaki-ink-strong);
+  line-height: 1.3;
+  letter-spacing: -0.2px;
+}
+
+.card-desc {
+  font-size: 0.85rem;
+  color: var(--itadaki-ink-subtle);
+  line-height: 1.5;
+  /* Two lines keep every card the same height on a grid. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.price {
+  font-family: var(--itadaki-font-display);
+  font-weight: 600;
+  font-size: 0.98rem;
+  color: var(--itadaki-ink-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+}
+
+.tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-subtle);
+  background: transparent;
+  border: 1px solid var(--itadaki-border);
+  padding: 0.12rem 0.5rem;
+  border-radius: var(--itadaki-radius-pill);
+}
+
+.empty {
+  text-align: center;
+  color: var(--itadaki-ink-subtle);
+  font-size: 0.9rem;
+  padding: 2rem 1rem;
+  line-height: 1.6;
+}
+
+.link {
+  background: none;
+  border: none;
+  color: var(--itadaki-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+/* Who else is at the table, always visible while browsing. */
+.table-bar {
+  position: fixed;
+  bottom: 4.6rem;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 18px;
+  background: color-mix(in oklab, var(--itadaki-surface) 92%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.table-label {
+  font-size: 0.72rem;
+  color: var(--itadaki-ink-subtle);
+  font-weight: 600;
+  margin-left: 0.25rem;
+}
+
+.foot {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.75rem 18px calc(0.75rem + env(safe-area-inset-bottom));
+  background: var(--itadaki-surface);
+  border-top: 1px solid var(--itadaki-border);
+}
+
+.cta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--itadaki-ink);
+  color: white;
+  border: none;
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.95rem 1.4rem;
+  font-family: var(--itadaki-font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Full width and its own row: the primary action on a card, not a corner icon. */
+.card-add {
+  display: block;
+  width: calc(100% - 2.1rem);
+  margin: 0 1.05rem 1.05rem;
+  border: none;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-ink);
+  color: white;
+  padding: 0.65rem 1rem;
+  font-family: var(--itadaki-font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 42px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.card-add:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* A dish with a required option is not a one-tap add, and says so. */
+.card-add.choose {
+  background: transparent;
+  border: 1.5px solid var(--itadaki-border);
+  color: var(--itadaki-ink-muted);
+  line-height: 1.6;
+}

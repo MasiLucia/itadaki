@@ -1,0 +1,167 @@
+:host {
+  display: block;
+  background: var(--itadaki-bg);
+  min-height: 100dvh;
+}
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  background: var(--itadaki-surface-raised);
+  border-bottom: 1px solid var(--itadaki-border);
+}
+
+.bar-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.bar-text strong {
+  font-family: var(--itadaki-font-display);
+  font-size: 0.95rem;
+  color: var(--itadaki-ink-strong);
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--itadaki-ink-subtle);
+  max-width: 46ch;
+}
+
+.bar-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.print,
+.ghost {
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.65rem 1.2rem;
+  font-family: var(--itadaki-font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 42px;
+}
+
+.print {
+  border: none;
+  background: var(--itadaki-ink);
+  color: white;
+}
+
+.ghost {
+  border: 1.5px solid var(--itadaki-border);
+  background: transparent;
+  color: var(--itadaki-ink-muted);
+}
+
+.sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 1rem;
+  padding: 1.25rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  border: 1px dashed var(--itadaki-border-dashed);
+  border-radius: var(--itadaki-radius-card);
+  padding: 1.4rem 1rem 1.2rem;
+  text-align: center;
+  break-inside: avoid;
+}
+
+.brand {
+  font-family: var(--itadaki-font-display);
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 3px;
+  color: var(--itadaki-accent);
+  margin: 0;
+}
+
+.table-name {
+  font-family: var(--itadaki-font-display);
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: oklch(22% 0.02 40);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+/* The quiet zone is part of the symbol: scanners need the white margin. */
+.qr {
+  width: 100%;
+  max-width: 190px;
+  height: auto;
+  padding: 10px;
+  background: white;
+}
+
+.instruction {
+  font-size: 0.76rem;
+  color: oklch(45% 0.02 40);
+  margin: 0;
+}
+
+.failed {
+  font-size: 0.8rem;
+  color: var(--itadaki-accent);
+  margin: 0;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--itadaki-ink-subtle);
+  font-size: 0.9rem;
+}
+
+/* Printing is the point of this screen, so the paper layout is not an
+   afterthought: chrome disappears and cards tile without splitting. */
+@media print {
+  :host {
+    background: white;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .sheet {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0;
+    padding: 0;
+    max-width: none;
+  }
+
+  .card {
+    border: 1px dashed oklch(80% 0 0);
+    border-radius: 0;
+    padding: 1.6cm 0.6cm;
+    page-break-inside: avoid;
+  }
+
+  .qr {
+    max-width: 5cm;
+  }
+
+  @page {
+    margin: 1cm;
+  }
+}

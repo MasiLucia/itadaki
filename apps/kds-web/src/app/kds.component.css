@@ -1,0 +1,437 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: var(--itadaki-ink);
+  padding: 1.25rem;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: oklch(72% 0.11 33);
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.title {
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 1.35rem;
+  color: white;
+  margin: 0.15rem 0 0;
+}
+
+.stations {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+/* Station filter: a grill screen should not show drinks. */
+.station {
+  border: 1px solid oklch(42% 0.02 40);
+  background: transparent;
+  color: oklch(80% 0.02 70);
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.55rem 1.1rem;
+  font-family: var(--itadaki-font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.station[aria-pressed='true'] {
+  background: white;
+  color: var(--itadaki-ink);
+  border-color: white;
+}
+
+.station:focus-visible {
+  outline: 3px solid var(--itadaki-accent-bright);
+  outline-offset: 2px;
+}
+
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.signout {
+  border: 1px solid oklch(42% 0.02 40);
+  background: transparent;
+  color: oklch(80% 0.02 70);
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.6rem 1.1rem;
+  font-family: var(--itadaki-font-display);
+  font-weight: 600;
+  font-size: 0.83rem;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.booting {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: oklch(72% 0.02 40);
+  margin: 0;
+}
+
+.live {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  background: oklch(30% 0.02 40);
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.6rem 1.1rem;
+  color: oklch(88% 0.02 70);
+  font-size: 0.83rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--itadaki-live);
+  animation: itadaki-pulse-dot 1.6s ease-in-out infinite;
+}
+
+.live.off .dot {
+  background: var(--itadaki-status-cooking);
+  animation: none;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 1240px) {
+  .board { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 680px) {
+  .board { grid-template-columns: 1fr; }
+}
+
+/**
+ * Each stage is a bounded panel, not a loose heading. Without the surface the
+ * tickets float on the background and the columns read as one long list.
+ */
+.col {
+  background: oklch(29% 0.018 40);
+  border-radius: var(--itadaki-radius-card);
+  padding: 0.9rem;
+  border-top: 5px solid var(--itadaki-ink-faint);
+  min-height: 8rem;
+}
+
+.col[data-status='SENT'] { border-top-color: var(--itadaki-status-new); }
+.col[data-status='ACCEPTED'] { border-top-color: oklch(70% 0.14 60); }
+.col[data-status='IN_PREP'] { border-top-color: var(--itadaki-status-cooking); }
+.col[data-status='READY'] { border-top-color: var(--itadaki-status-ready); }
+
+.col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid oklch(38% 0.02 40);
+}
+
+.col-name {
+  color: white;
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 0;
+}
+
+.col-count {
+  color: var(--itadaki-ink-strong);
+  background: oklch(78% 0.02 70);
+  border-radius: var(--itadaki-radius-pill);
+  min-width: 30px;
+  padding: 0.15rem 0.55rem;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tickets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.ticket {
+  background: var(--itadaki-surface);
+  border-radius: var(--itadaki-radius-tile);
+  padding: 1rem;
+  animation: itadaki-pop-in 0.35s ease;
+  /* The left rail is the SLA semaphore: readable across the kitchen. */
+  border-left: 6px solid var(--itadaki-status-ready);
+}
+
+.ticket[data-sla='warning'] { border-left-color: var(--itadaki-status-cooking); }
+.ticket[data-sla='late'] {
+  border-left-color: var(--itadaki-accent);
+  box-shadow: 0 0 0 2px oklch(50% 0.17 33 / 0.4);
+}
+
+.ticket-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px dashed var(--itadaki-border-dashed);
+}
+
+/* The table number is what a cook scans the board for, so it outranks
+   everything else on the ticket — read from across the kitchen, not up close. */
+.ticket-table {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-family: var(--itadaki-font-display);
+  color: var(--itadaki-ink-strong);
+}
+
+.table-word {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--itadaki-ink-subtle);
+}
+
+.table-number {
+  font-size: 2.1rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-time {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--itadaki-ink-subtle);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ticket[data-sla='late'] .ticket-time { color: var(--itadaki-accent); }
+
+.ticket-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ticket-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: start;
+}
+
+/* Quantity is what a cook checks first; give it weight of its own. */
+.qty {
+  font-family: var(--itadaki-font-display);
+  font-weight: 800;
+  font-size: 1rem;
+  color: white;
+  background: var(--itadaki-ink);
+  border-radius: 8px;
+  min-width: 28px;
+  padding: 0.1rem 0.35rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.item-name {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-strong);
+  line-height: 1.3;
+}
+
+.item-note {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--itadaki-accent);
+}
+
+.item-station {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-surface-sunken);
+  color: var(--itadaki-ink-muted);
+  white-space: nowrap;
+}
+
+.item-station[data-station='GRILL'] { background: oklch(88% 0.08 40); color: oklch(35% 0.12 40); }
+.item-station[data-station='COLD'] { background: oklch(88% 0.07 220); color: oklch(35% 0.12 240); }
+.item-station[data-station='BAR'] { background: oklch(90% 0.09 85); color: oklch(38% 0.12 70); }
+.item-station[data-station='DESSERT'] { background: oklch(90% 0.07 320); color: oklch(38% 0.12 330); }
+
+.ticket-btn {
+  width: 100%;
+  margin-top: 0.9rem;
+  border: none;
+  border-radius: 12px;
+  padding: 0.85rem;
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  background: var(--itadaki-ink);
+  color: white;
+  min-height: 48px;
+}
+
+.ticket-btn:active { transform: scale(0.98); }
+
+.ticket-btn:focus-visible {
+  outline: 3px solid var(--itadaki-accent-bright);
+  outline-offset: 2px;
+}
+
+.empty {
+  border: 1.5px dashed oklch(40% 0.02 40);
+  border-radius: var(--itadaki-radius-tile);
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: oklch(66% 0.02 40);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* A raised hand outranks the ticket board: terracotta, above everything. */
+.calls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0 1.25rem 1rem;
+}
+
+.call {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border: none;
+  border-radius: var(--itadaki-radius-chip);
+  background: var(--itadaki-accent);
+  color: white;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  animation: itadaki-pulse-dot 2.4s ease-in-out infinite;
+}
+
+.call-table {
+  font-family: var(--itadaki-font-display);
+  font-weight: 800;
+  font-size: 1.5rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.call-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.call-reason {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.call-note {
+  font-size: 0.76rem;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.call-wait {
+  font-size: 0.76rem;
+  font-weight: 600;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call { animation: none; }
+}
+
+/* Per-dish action: small and inline, so the ticket's own button stays the
+   primary move for the common case of sending everything together. */
+.item-btn {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  border: 1px solid var(--itadaki-border);
+  background: var(--itadaki-surface-raised);
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.25rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--itadaki-ink-muted);
+  cursor: pointer;
+}
+
+.item-done {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--itadaki-status-ready-fg);
+}
+
+/* A dish ahead of its ticket is dimmed: it is no longer what the cook needs. */
+.ticket-item[data-item-status='READY'] .item-name,
+.ticket-item[data-item-status='DELIVERED'] .item-name {
+  color: var(--itadaki-ink-subtle);
+  text-decoration: line-through;
+}

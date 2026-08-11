@@ -1,0 +1,71 @@
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { type CallReason } from '@itadaki/ordering/domain';
+import { ApiClient } from './api-client';
+
+export interface CallDto {
+  readonly id: string;
+  readonly reason: CallReason;
+  readonly status: string;
+  readonly note: string;
+  readonly raisedAt: string;
+}
+
+/**
+ * What this table has asked for and is still waiting on.
+ *
+ * Kept server-side rather than in local state: the same table on a second
+ * phone has to see that someone already called, or the staff screen fills up
+ * with the same request from every device.
+ */
+@Injectable({ providedIn: 'root' })
+export class CallStore {
+  private readonly api = inject(ApiClient);
+
+  readonly pending = signal<readonly CallDto[]>([]);
+  readonly busy = signal(false);
+  readonly error = signal<string | null>(null);
+
+  readonly waitingFor = computed(() => new Set(this.pending().map((call) => call.reason)));
+
+  async load(sessionId: string): Promise<void> {
+    try {
+      const response = await this.api.fetch(`/calls/${sessionId}`);
+      if (!response.ok) return;
+      this.pending.set((await response.json()) as CallDto[]);
+    } catch {
+      // Keep the last known state; the socket or next tap retries.
+    }
+  }
+
+  /**
+   * Raises a call. The API returns the existing one if the table already has
+   * that request open, so tapping twice is harmless.
+   */
+  async raise(sessionId: string, reason: CallReason, note = ''): Promise<boolean> {
+    this.busy.set(true);
+    this.error.set(null);
+
+    try {
+      const response = await this.api.send(`/calls/${sessionId}`, 'POST', { reason, note });
+      if (!response.ok) {
+        const detail = (await response.json().catch(() => null)) as { kind?: string } | null;
+        this.error.set(
+          detail?.kind === 'TOO_MANY_REQUESTS'
+            ? 'Esperá un momento antes de volver a llamar'
+            : detail?.kind === 'SESSION_CLOSED'
+              ? 'La cuenta de esta mesa ya se cerró'
+              : 'No pudimos avisar. Probá de nuevo.',
+        );
+        return false;
+      }
+
+      await this.load(sessionId);
+      return true;
+    } catch {
+      this.error.set('Sin conexión');
+      return false;
+    } finally {
+      this.busy.set(false);
+    }
+  }
+}

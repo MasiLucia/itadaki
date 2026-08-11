@@ -1,0 +1,234 @@
+:host { display: block; }
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 460px;
+}
+
+.stage {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--itadaki-radius-card);
+  background: var(--itadaki-surface-sunken);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* Only show the grab cursor when there is actually somewhere to drag to. */
+.stage.pannable { cursor: grab; }
+.stage.pannable:active { cursor: grabbing; }
+
+.modes {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.mode {
+  flex: 1;
+  border: 1px solid var(--itadaki-border);
+  background: var(--itadaki-surface);
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.6rem 0.9rem;
+  font-family: var(--itadaki-font-display);
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--itadaki-ink-muted);
+  cursor: pointer;
+  min-height: 42px;
+}
+
+.mode[aria-pressed='true'] {
+  background: var(--itadaki-ink);
+  border-color: var(--itadaki-ink);
+  color: white;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.blur { will-change: filter; }
+
+.focal {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.focal-ring {
+  display: block;
+  border: 2px solid oklch(100% 0 0 / 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px oklch(0% 0 0 / 0.35), inset 0 0 0 1px oklch(0% 0 0 / 0.25);
+  transform: translate(-50%, -50%);
+  position: absolute;
+}
+
+/* Rule-of-thirds guides, drawn over everything. */
+.grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, oklch(100% 0 0 / 0.25) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(100% 0 0 / 0.25) 1px, transparent 1px);
+  background-size: 33.333% 33.333%;
+  background-position: 33.333% 33.333%;
+  background-repeat: repeat;
+}
+
+.existing-note {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--itadaki-ink-muted);
+  background: var(--itadaki-surface-sunken);
+  border-radius: var(--itadaki-radius-chip);
+  padding: 0.45rem 0.6rem;
+}
+
+.primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.auto-note {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--itadaki-status-ready-fg);
+  background: var(--itadaki-status-ready-bg);
+  border-radius: var(--itadaki-radius-chip);
+  padding: 0.45rem 0.6rem;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--itadaki-ink-subtle);
+  text-align: center;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem 1rem;
+}
+
+@media (max-width: 420px) {
+  .controls { grid-template-columns: 1fr; }
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.control-label {
+  font-size: 0.74rem;
+  color: var(--itadaki-ink-muted);
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.control-label b {
+  font-variant-numeric: tabular-nums;
+  color: var(--itadaki-ink-strong);
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--itadaki-accent);
+  min-height: 24px;
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.primary,
+.ghost {
+  flex: 1;
+  border: none;
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.85rem;
+  font-family: var(--itadaki-font-display);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.primary { background: var(--itadaki-ink); color: white; }
+
+.ghost {
+  background: var(--itadaki-surface-sunken);
+  color: var(--itadaki-ink);
+}
+
+.file-swap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.file-swap input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  aspect-ratio: 1;
+  border: 2px dashed var(--itadaki-border);
+  border-radius: var(--itadaki-radius-card);
+  background: var(--itadaki-surface-raised);
+  cursor: pointer;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.dropzone input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+.dropzone-title {
+  font-family: var(--itadaki-font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--itadaki-ink-strong);
+}
+
+.dropzone-hint {
+  font-size: 0.76rem;
+  color: var(--itadaki-ink-subtle);
+}
+
+.dropzone:focus-within {
+  outline: 3px solid var(--itadaki-accent-bright);
+  outline-offset: 2px;
+}

@@ -1,0 +1,119 @@
+/**
+ * Design tokens extracted from ITADAKI.dc.html.
+ * Colors stay in oklch exactly as authored — converting to hex would flatten
+ * the perceptual spacing the palette relies on.
+ */
+
+:root {
+  /* Brand — terracotta accent, used for price, active state, primary CTA */
+  --itadaki-accent: oklch(50% 0.17 33);
+  --itadaki-accent-bright: oklch(62% 0.19 33);
+  --itadaki-accent-soft: oklch(70% 0.15 33 / 0.18);
+  --itadaki-accent-hover: oklch(45% 0.18 33);
+
+  /* Ink — near-black warm brown; primary text and dark surfaces */
+  --itadaki-ink: oklch(24% 0.02 40);
+  --itadaki-ink-strong: oklch(22% 0.02 40);
+  --itadaki-ink-muted: oklch(38% 0.03 40);
+  --itadaki-ink-subtle: oklch(50% 0.03 40);
+  /* 54% keeps this above 4.5:1 on the cream surface with margin to spare. */
+  --itadaki-ink-faint: oklch(54% 0.03 40);
+  --itadaki-ink-disabled: oklch(65% 0.02 40);
+
+  /* Surfaces — warm cream, not white */
+  --itadaki-bg: oklch(96.5% 0.02 80);
+  --itadaki-surface: oklch(97% 0.02 80);
+  --itadaki-surface-raised: white;
+  --itadaki-surface-sunken: oklch(93% 0.02 70);
+  --itadaki-border: oklch(90% 0.02 70);
+  --itadaki-border-dashed: oklch(85% 0.02 70);
+
+  /* Status — KDS columns and order lifecycle */
+  --itadaki-status-new: oklch(60% 0.19 33);
+  --itadaki-status-cooking: oklch(75% 0.15 85);
+  --itadaki-status-ready: oklch(65% 0.15 150);
+  --itadaki-status-ready-bg: oklch(90% 0.1 150 / 0.3);
+  --itadaki-status-ready-fg: oklch(40% 0.1 150);
+  --itadaki-live: oklch(72% 0.16 150);
+
+  /* Decorative blobs on the landing surface */
+  --itadaki-blob-green: oklch(72% 0.13 150 / 0.22);
+  --itadaki-blob-amber: oklch(80% 0.13 85 / 0.25);
+
+  /* Typography — Unbounded for display, Onest for body */
+  --itadaki-font-display: 'Unbounded', sans-serif;
+  --itadaki-font-body: 'Onest', sans-serif;
+
+  /* Radii — pill-first; cards are generously rounded */
+  --itadaki-radius-pill: 100px;
+  --itadaki-radius-card: 20px;
+  --itadaki-radius-panel: 28px;
+  --itadaki-radius-sheet: 18px;
+  --itadaki-radius-tile: 16px;
+  --itadaki-radius-chip: 14px;
+
+  /* Elevation */
+  --itadaki-shadow-card: 0 2px 10px oklch(24% 0.02 40 / 0.06);
+  --itadaki-shadow-raised: 0 6px 16px oklch(24% 0.02 40 / 0.25);
+  --itadaki-shadow-cta: 0 8px 20px oklch(24% 0.02 40 / 0.25);
+  --itadaki-shadow-cta-accent: 0 8px 20px oklch(50% 0.17 33 / 0.3);
+  --itadaki-shadow-panel: 0 20px 50px oklch(24% 0.02 40 / 0.3);
+}
+
+/**
+ * Motion. Every animation here is decorative, so it collapses under
+ * prefers-reduced-motion — the wiggling wordmark is exactly the kind of
+ * effect that triggers vestibular discomfort.
+ */
+@keyframes itadaki-floaty {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-18px) rotate(6deg); }
+}
+
+@keyframes itadaki-floaty-alt {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(14px) rotate(-8deg); }
+}
+
+@keyframes itadaki-steam {
+  0% { transform: translateY(0) scaleX(1); opacity: 0.5; }
+  50% { transform: translateY(-14px) scaleX(1.3); opacity: 0.9; }
+  100% { transform: translateY(-28px) scaleX(1); opacity: 0; }
+}
+
+@keyframes itadaki-wiggle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-6px) rotate(-4deg); }
+  75% { transform: translateY(-2px) rotate(4deg); }
+}
+
+@keyframes itadaki-slide-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes itadaki-pop-in {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes itadaki-toast-in {
+  0% { opacity: 0; transform: translate(-50%, 12px); }
+  15%, 85% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -8px); }
+}
+
+@keyframes itadaki-pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

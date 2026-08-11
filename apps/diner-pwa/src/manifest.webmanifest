@@ -1,0 +1,11 @@
+{
+  "name": "ITADAKI",
+  "short_name": "ITADAKI",
+  "description": "Escaneá el QR de tu mesa, armá tu pedido y seguilo en vivo.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2ede3",
+  "theme_color": "#f2ede3",
+  "lang": "es-AR",
+  "icons": []
+}

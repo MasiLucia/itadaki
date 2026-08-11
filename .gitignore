@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+.angular/
+*.log
+.DS_Store
+.image-store/

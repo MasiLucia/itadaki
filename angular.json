@@ -1,0 +1,213 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "newProjectRoot": "apps",
+  "projects": {
+    "diner-pwa": {
+      "projectType": "application",
+      "root": "apps/diner-pwa",
+      "sourceRoot": "apps/diner-pwa/src",
+      "prefix": "itd",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "apps/diner-pwa/src/main.ts",
+            "index": "apps/diner-pwa/src/index.html",
+            "tsConfig": "apps/diner-pwa/tsconfig.app.json",
+            "styles": [
+              "libs/shared/ui-tokens/src/lib/tokens.css",
+              "apps/diner-pwa/src/styles.css"
+            ],
+            "outputPath": "dist/diner-pwa",
+            "assets": [
+              {
+                "glob": "sw.js",
+                "input": "apps/diner-pwa/src",
+                "output": "/"
+              },
+              {
+                "glob": "manifest.webmanifest",
+                "input": "apps/diner-pwa/src",
+                "output": "/"
+              }
+            ],
+            "polyfills": [
+              "zone.js"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "300kb",
+                  "maximumError": "500kb"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "diner-pwa:build:production"
+            },
+            "development": {
+              "buildTarget": "diner-pwa:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
+    },
+    "kds-web": {
+      "projectType": "application",
+      "root": "apps/kds-web",
+      "sourceRoot": "apps/kds-web/src",
+      "prefix": "itd",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "apps/kds-web/src/main.ts",
+            "index": "apps/kds-web/src/index.html",
+            "tsConfig": "apps/kds-web/tsconfig.app.json",
+            "styles": [
+              "libs/shared/ui-tokens/src/lib/tokens.css",
+              "apps/kds-web/src/styles.css"
+            ],
+            "outputPath": "dist/kds-web",
+            "polyfills": [
+              "zone.js"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "kds-web:build:production"
+            },
+            "development": {
+              "buildTarget": "kds-web:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
+    },
+    "admin-web": {
+      "projectType": "application",
+      "root": "apps/admin-web",
+      "sourceRoot": "apps/admin-web/src",
+      "prefix": "itd",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "apps/admin-web/src/main.ts",
+            "index": "apps/admin-web/src/index.html",
+            "tsConfig": "apps/admin-web/tsconfig.app.json",
+            "styles": [
+              "libs/shared/ui-tokens/src/lib/tokens.css",
+              "apps/admin-web/src/styles.css"
+            ],
+            "outputPath": "dist/admin-web",
+            "polyfills": [
+              "zone.js"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "admin-web:build:production"
+            },
+            "development": {
+              "buildTarget": "admin-web:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
+    },
+    "floor-web": {
+      "projectType": "application",
+      "root": "apps/floor-web",
+      "sourceRoot": "apps/floor-web/src",
+      "prefix": "itd",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "apps/floor-web/src/main.ts",
+            "index": "apps/floor-web/src/index.html",
+            "tsConfig": "apps/floor-web/tsconfig.app.json",
+            "styles": [
+              "libs/shared/ui-tokens/src/lib/tokens.css",
+              "apps/floor-web/src/styles.css"
+            ],
+            "outputPath": "dist/floor-web",
+            "polyfills": [
+              "zone.js"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "floor-web:build:production"
+            },
+            "development": {
+              "buildTarget": "floor-web:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
+    }
+  },
+  "cli": {
+    "analytics": "0c8e4a89-85d2-4af2-9cb6-2152e779119e"
+  }
+}

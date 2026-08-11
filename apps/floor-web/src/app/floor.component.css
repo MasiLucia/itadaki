@@ -1,0 +1,233 @@
+/* Built for a phone held one-handed while walking, not a mounted tablet. */
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: var(--itadaki-surface);
+  padding: 1rem 1rem calc(2rem + env(safe-area-inset-bottom));
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--itadaki-ink-faint);
+  margin: 0;
+}
+
+.title {
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: var(--itadaki-ink-strong);
+  margin: 0.15rem 0 0;
+  letter-spacing: -0.4px;
+}
+
+.head-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.live {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-subtle);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--itadaki-live);
+  animation: itadaki-pulse-dot 1.6s ease-in-out infinite;
+}
+
+.live.off .dot {
+  background: var(--itadaki-status-cooking);
+  animation: none;
+}
+
+.signout {
+  border: 1px solid var(--itadaki-border);
+  background: transparent;
+  color: var(--itadaki-ink-subtle);
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.4rem 0.9rem;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.booting {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--itadaki-ink-subtle);
+  margin: 0;
+}
+
+.block {
+  margin-bottom: 1.5rem;
+}
+
+.block-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--itadaki-ink-faint);
+  margin: 0 0 0.6rem;
+}
+
+.count {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 0.4rem;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-accent);
+  color: white;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.count.ready {
+  background: var(--itadaki-status-ready);
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--itadaki-radius-card);
+  background: var(--itadaki-surface-raised);
+  box-shadow: var(--itadaki-shadow-card);
+  margin-bottom: 0.55rem;
+}
+
+/* Someone is waiting: this outranks everything else on the screen. */
+.card.call {
+  border-left: 5px solid var(--itadaki-accent);
+}
+
+.card.pickup {
+  border-left: 5px solid var(--itadaki-status-ready);
+}
+
+.card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.card-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.table {
+  font-family: var(--itadaki-font-display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--itadaki-ink-strong);
+  letter-spacing: -0.3px;
+}
+
+.table.small {
+  font-size: 0.85rem;
+}
+
+.reason,
+.dish {
+  font-size: 0.87rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-muted);
+}
+
+.note {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--itadaki-accent);
+}
+
+.waited {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-subtle);
+  white-space: nowrap;
+}
+
+/* Thumb-sized: tapped while carrying plates. */
+.action {
+  border: none;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-ink);
+  color: white;
+  padding: 0.6rem 1.2rem;
+  font-family: var(--itadaki-font-display);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+
+.quiet {
+  font-size: 0.85rem;
+  color: var(--itadaki-ink-subtle);
+  margin: 0;
+  padding: 0.6rem 0.2rem;
+}
+
+.quiet-title {
+  color: var(--itadaki-ink-faint);
+}
+
+/* Reference, not a task list — no buttons, quieter type. */
+.cooking-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0 0 0.4rem;
+  padding: 0.4rem 0.2rem;
+  border-bottom: 1px dashed var(--itadaki-border-dashed);
+}
+
+.cooking-items {
+  font-size: 0.8rem;
+  color: var(--itadaki-ink-subtle);
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot { animation: none; }
+}

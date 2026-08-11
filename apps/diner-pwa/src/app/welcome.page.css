@@ -1,0 +1,97 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  background: linear-gradient(180deg, oklch(97% 0.02 80), oklch(93% 0.03 70));
+}
+
+.welcome {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.bowl {
+  width: 100px;
+  height: 64px;
+  border-radius: 0 0 46px 46px;
+  background: oklch(88% 0.02 70);
+  border: 3px solid var(--itadaki-ink);
+  position: relative;
+}
+
+.steam {
+  position: absolute;
+  top: -8px;
+  width: 8px;
+  height: 16px;
+  background: var(--itadaki-surface);
+  border-radius: 2px;
+  animation: itadaki-steam 2.4s ease-in-out infinite;
+}
+
+.s1 { left: 14px; }
+.s2 { left: 44px; animation-delay: 0.6s; }
+.s3 { left: 74px; animation-delay: 1.2s; }
+
+.table {
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 2px;
+  color: var(--itadaki-accent);
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.greeting {
+  font-family: var(--itadaki-font-display);
+  font-weight: 800;
+  font-size: 1.9rem;
+  margin: 0;
+  color: var(--itadaki-ink-strong);
+  letter-spacing: -0.5px;
+}
+
+.lede {
+  margin: 0;
+  color: var(--itadaki-ink-muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  max-width: 17rem;
+  text-wrap: balance;
+}
+
+.cta {
+  margin-top: 0.5rem;
+  background: var(--itadaki-ink);
+  color: var(--itadaki-surface);
+  border-radius: var(--itadaki-radius-pill);
+  padding: 1rem 2.1rem;
+  font-family: var(--itadaki-font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  box-shadow: var(--itadaki-shadow-cta);
+}
+
+.dots {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: itadaki-pulse-dot 1.6s ease-in-out infinite;
+}
+
+.d1 { background: var(--itadaki-accent-bright); }
+.d2 { background: var(--itadaki-status-ready); animation-delay: 0.3s; }
+.d3 { background: var(--itadaki-status-cooking); animation-delay: 0.6s; }
