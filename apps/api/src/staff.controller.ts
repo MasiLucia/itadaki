@@ -11,7 +11,9 @@ import {
 import { ROLES, type Role, validateCredentials } from '@itadaki/identity/domain';
 import { hashPassword } from '@itadaki/identity/infra';
 import { z } from 'zod';
-import { Auth, type AuthContext, RequirePermission, TenantId } from './auth';
+import { Auth, type AuthContext, RequirePermission, TenantId,
+  forgetActiveState,
+} from './auth';
 import { StaffService } from './staff.service';
 
 const inviteSchema = z.object({
@@ -110,6 +112,10 @@ export class StaffController {
     if (updated.isErr()) {
       throw new HttpException(updated.error, HttpStatus.NOT_FOUND);
     }
+
+    // Takes effect now rather than whenever the cached state ages out: the
+    // person doing this is standing in front of the screen expecting it to.
+    forgetActiveState(tenantId, userId);
     return updated.value;
   }
 }

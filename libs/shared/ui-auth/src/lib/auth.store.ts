@@ -269,7 +269,12 @@ export class AuthStore {
    */
   expired(response: { status: number }): boolean {
     if (response.status !== 401) return false;
-    if (this.signedIn()) this.signOut();
+    if (this.signedIn()) {
+      this.signOut();
+      // A revoked account and an expired session both land here; saying so is
+      // kinder than a bare login screen when someone was let go mid-shift.
+      this.error.set('Tu sesión terminó. Volvé a entrar.');
+    }
     return true;
   }
 

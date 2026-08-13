@@ -19,7 +19,9 @@
     "db:down": "docker compose down",
     "db:staff": "npm run build:api && node dist/api/apps/api/src/create-staff.js",
     "db:trial": "npm run build:api && node dist/api/apps/api/src/manage-trial.js",
-    "db:reset": "docker compose down -v && npm run db:up && npm run db:seed"
+    "db:reset": "docker compose down -v && npm run db:up && npm run db:seed",
+    "db:backup": "bash scripts/backup.sh",
+    "db:restore": "bash scripts/restore.sh"
   },
   "devDependencies": {
     "@angular/build": "^19.2.27",

@@ -21,3 +21,4 @@ export {
   verifyGoogleIdToken,
   isGoogleError,
 } from './lib/google-token';
+export { ResendMailer } from './lib/resend-mailer';

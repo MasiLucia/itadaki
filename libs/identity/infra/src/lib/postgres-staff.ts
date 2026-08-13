@@ -94,6 +94,28 @@ export class PostgresStaffStore {
    * Deactivating rather than deleting: orders and bills reference the person
    * who handled them, so removing the row would erase that trail.
    */
+  /**
+   * Whether this account may still act, for the guard on every request.
+   *
+   * Narrow on purpose: a signed token already carries who the person is, so
+   * the only open question is whether they were let go since it was issued.
+   */
+  async isActive(tenantId: string, userId: string): Promise<boolean> {
+    try {
+      return await this.db.withTenant(tenantId, async (client) => {
+        const result = await client.query<{ active: boolean }>(
+          'SELECT active FROM staff_users WHERE id = $1',
+          [userId],
+        );
+        return result.rows[0]?.active ?? false;
+      });
+    } catch {
+      // A database blip must not sign the whole restaurant out mid-service;
+      // the token is still signed and unexpired, so it stands.
+      return true;
+    }
+  }
+
   async setActive(
     tenantId: string,
     userId: string,

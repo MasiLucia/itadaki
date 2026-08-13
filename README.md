@@ -100,11 +100,35 @@ En desarrollo funcionan los valores por defecto. Para producción:
 | `DATABASE_ADMIN_URL` | Sólo para migraciones y seed. |
 | `GOOGLE_CLIENT_ID` | Habilita el ingreso con Google. Sin ella, el botón no aparece. |
 | `SESSION_STALE_HOURS` | Cuánto puede quedar abierta una mesa antes de cerrarse sola (8 por defecto). |
+| `RESEND_API_KEY` | Envía los mails de recuperación de contraseña. Obligatoria en producción. |
+| `MAIL_FROM` | Remitente verificado, p. ej. `Itadaki <hola@tudominio.com>`. Obligatoria en producción. |
+| `NODE_ENV=production` | Endurece el arranque: exige los secretos, falla si Postgres no responde y agrega HSTS. |
+
+Las apps del navegador no llevan la URL de la API compilada: la leen en runtime
+del `<meta name="itadaki-api">` de su `index.html`. El mismo build sirve para
+cualquier despliegue; el entorno completa la etiqueta.
+
+## Respaldos
+
+```bash
+scripts/backup.sh                    # dump a ./backups, guarda los últimos 14
+scripts/restore.sh backups/<archivo> # restaura (pide confirmación)
+```
+
+El restore está probado de punta a punta: restaura los datos, reaplica los
+permisos del rol de la app y deja la API operativa sin pasos manuales.
+
+Un respaldo en el mismo disco que la base no es un respaldo. Copialo afuera —
+un cron diario con `rclone`, `scp` o lo que uses — y **probá una restauración
+antes de necesitarla**: un dump que nunca se restauró es una suposición, no
+una copia de seguridad.
 
 ## Pendiente antes de producción
 
 - Las imágenes se guardan en disco local (`.image-store/`): se pierden al
-  redesplegar y no sirven con más de una instancia.
-- Las URLs de la API están fijas en el código de las apps.
-- Las dependencias de runtime están en `devDependencies`.
-- No hay Dockerfile ni CI.
+  redesplegar y no sirven con más de una instancia. Es lo único que impide
+  correr más de una instancia de la API.
+- No hay Dockerfile: el CI verifica el build y el arranque, pero el empaquetado
+  para el servidor todavía no está.
+- No hay integración de cobro ni facturación ARCA. Decisión tomada: el
+  restaurante cobra con su propio sistema.

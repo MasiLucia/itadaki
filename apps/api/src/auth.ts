@@ -17,7 +17,12 @@ import {
   describeSubscription,
 } from '@itadaki/identity/domain';
 import { peekTableToken, verifyToken, verifyTableToken } from '@itadaki/identity/infra';
-import { InMemoryTableStore, PostgresTableStore, PostgresTenantStore } from '@itadaki/identity/infra';
+import {
+  InMemoryTableStore,
+  PostgresStaffStore,
+  PostgresTableStore,
+  PostgresTenantStore,
+} from '@itadaki/identity/infra';
 import { database } from './database';
 import { type Request } from 'express';
 
@@ -87,11 +92,55 @@ export const RequirePermission = (permission: Permission): MethodDecorator =>
  * whole point: `?tenant=` used to let anyone read another restaurant's data by
  * editing the URL.
  */
+/**
+ * How long a revoked account may keep working.
+ *
+ * Checking the database on every request would put a query in front of every
+ * kitchen poll; never checking means a fired waiter keeps reading orders until
+ * their token expires, which was up to twelve hours. A minute is short enough
+ * that "lo saqué del sistema" is true by the time the sentence ends.
+ */
+const ACTIVE_CACHE_MS = 60_000;
+
+const activeCache = new Map<string, { active: boolean; checkedAt: number }>();
+
+/** Drops a user's cached state, so a revocation takes effect immediately. */
+export function forgetActiveState(tenantId: string, userId: string): void {
+  activeCache.delete(`${tenantId}:${userId}`);
+}
+
+/** Seam for tests: the real one needs the staff table in Postgres. */
+export type ActiveLookup = (tenantId: string, userId: string) => Promise<boolean>;
+
+const lookUpActive: ActiveLookup = async (tenantId, userId) => {
+  // In-memory mode has no staff table to ask; the token is the whole truth.
+  if (process.env['USE_POSTGRES'] === 'false') return true;
+  return new PostgresStaffStore(database).isActive(tenantId, userId);
+};
+
+export async function stillEmployed(
+  tenantId: string,
+  userId: string,
+  lookUp: ActiveLookup = lookUpActive,
+): Promise<boolean> {
+  const key = `${tenantId}:${userId}`;
+  const cached = activeCache.get(key);
+  const now = Date.now();
+
+  if (cached !== undefined && now - cached.checkedAt < ACTIVE_CACHE_MS) {
+    return cached.active;
+  }
+
+  const active = await lookUp(tenantId, userId);
+  activeCache.set(key, { active, checkedAt: now });
+  return active;
+}
+
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const handler = context.getHandler();
     const controller = context.getClass();
 
@@ -111,6 +160,11 @@ export class AuthGuard implements CanActivate {
     const payload = verifyToken(token, AUTH_SECRET, new Date());
     if (payload === null) {
       throw new UnauthorizedException({ kind: 'INVALID_SESSION' });
+    }
+
+    // Signed and unexpired is not the same as still working here.
+    if (!(await stillEmployed(payload.tenantId, payload.userId))) {
+      throw new UnauthorizedException({ kind: 'ACCESS_REVOKED' });
     }
 
     request.auth = {
