@@ -1,6 +1,7 @@
 import {
   type CallReason,
   type CallStatus,
+  type PaymentMethod,
   type TableCall,
 } from '@itadaki/ordering/domain';
 import { type Result, err, ok } from '@itadaki/shared/domain';
@@ -18,6 +19,7 @@ interface CallRow {
   reason: string;
   status: string;
   note: string;
+  payment_method: string | null;
   raised_at: string;
   acknowledged_at: string | null;
 }
@@ -30,6 +32,7 @@ const toCall = (row: CallRow): TableCall => ({
   reason: row.reason as CallReason,
   status: row.status as CallStatus,
   note: row.note,
+  paymentMethod: (row.payment_method as PaymentMethod | null) ?? null,
   raisedAt: new Date(row.raised_at),
   acknowledgedAt: row.acknowledged_at === null ? null : new Date(row.acknowledged_at),
 });
@@ -61,8 +64,9 @@ export class PostgresCallStore {
 
         await client.query(
           `INSERT INTO table_calls
-             (tenant_id, id, session_id, table_id, reason, status, note, raised_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+             (tenant_id, id, session_id, table_id, reason, status, note,
+              payment_method, raised_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [
             call.tenantId,
             call.id,
@@ -71,6 +75,7 @@ export class PostgresCallStore {
             call.reason,
             call.status,
             call.note,
+            call.paymentMethod,
             call.raisedAt,
           ],
         );

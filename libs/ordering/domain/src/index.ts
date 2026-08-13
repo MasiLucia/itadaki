@@ -49,6 +49,9 @@ export {
 export {
   CALL_REASONS,
   type CallReason,
+  PAYMENT_METHODS,
+  type PaymentMethod,
+  needsCardReader,
   type CallStatus,
   type TableCall,
   CALL_STALE_MINUTES,

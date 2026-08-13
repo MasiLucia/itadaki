@@ -8,7 +8,14 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { CALL_REASONS, type CallReason, type TableCall } from '@itadaki/ordering/domain';
+import {
+  CALL_REASONS,
+  PAYMENT_METHODS,
+  type CallReason,
+  type PaymentMethod,
+  type TableCall,
+  needsCardReader,
+} from '@itadaki/ordering/domain';
 import { z } from 'zod';
 import {
   type DinerScope,
@@ -26,6 +33,8 @@ import { RealtimeGateway } from './realtime.gateway';
 const raiseSchema = z.object({
   reason: z.enum(CALL_REASONS),
   note: z.string().max(160).default(''),
+  /** Only asked when the reason is BILL. */
+  paymentMethod: z.enum(PAYMENT_METHODS).optional(),
 });
 
 const toDto = (call: TableCall) => ({
@@ -35,6 +44,9 @@ const toDto = (call: TableCall) => ({
   reason: call.reason,
   status: call.status,
   note: call.note,
+  paymentMethod: call.paymentMethod,
+  /** Precomputed so no screen has to re-derive the rule. */
+  needsCardReader: needsCardReader(call),
   raisedAt: call.raisedAt.toISOString(),
 });
 
@@ -104,6 +116,11 @@ export class CallsController {
       reason: parsed.data.reason as CallReason,
       status: 'PENDING',
       note: parsed.data.note.trim(),
+      // Only a bill request carries one; anywhere else it would be noise.
+      paymentMethod:
+        parsed.data.reason === 'BILL'
+          ? ((parsed.data.paymentMethod ?? 'UNDECIDED') as PaymentMethod)
+          : null,
       raisedAt: new Date(),
       acknowledgedAt: null,
     });

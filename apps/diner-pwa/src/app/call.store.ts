@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { type CallReason } from '@itadaki/ordering/domain';
+import { type CallReason, type PaymentMethod } from '@itadaki/ordering/domain';
 import { ApiClient } from './api-client';
 
 export interface CallDto {
@@ -7,6 +7,7 @@ export interface CallDto {
   readonly reason: CallReason;
   readonly status: string;
   readonly note: string;
+  readonly paymentMethod: PaymentMethod | null;
   readonly raisedAt: string;
 }
 
@@ -41,12 +42,21 @@ export class CallStore {
    * Raises a call. The API returns the existing one if the table already has
    * that request open, so tapping twice is harmless.
    */
-  async raise(sessionId: string, reason: CallReason, note = ''): Promise<boolean> {
+  async raise(
+    sessionId: string,
+    reason: CallReason,
+    note = '',
+    paymentMethod?: PaymentMethod,
+  ): Promise<boolean> {
     this.busy.set(true);
     this.error.set(null);
 
     try {
-      const response = await this.api.send(`/calls/${sessionId}`, 'POST', { reason, note });
+      const response = await this.api.send(`/calls/${sessionId}`, 'POST', {
+        reason,
+        note,
+        ...(paymentMethod === undefined ? {} : { paymentMethod }),
+      });
       if (!response.ok) {
         const detail = (await response.json().catch(() => null)) as { kind?: string } | null;
         this.error.set(

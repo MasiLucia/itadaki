@@ -11,6 +11,16 @@ export type CallReason = (typeof CALL_REASONS)[number];
 
 export type CallStatus = 'PENDING' | 'ACKNOWLEDGED';
 
+/**
+ * How the table intends to pay, when they ask for the bill.
+ *
+ * Its own field rather than a note: the waiter has to know whether to bring
+ * the card reader before walking over, and a free-text line is something you
+ * read rather than something you see.
+ */
+export const PAYMENT_METHODS = ['CARD', 'CASH', 'UNDECIDED'] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
 export interface TableCall {
   readonly id: string;
   readonly tenantId: string;
@@ -19,6 +29,8 @@ export interface TableCall {
   readonly reason: CallReason;
   readonly status: CallStatus;
   readonly note: string;
+  /** Only meaningful on a BILL call; null everywhere else. */
+  readonly paymentMethod: PaymentMethod | null;
   readonly raisedAt: Date;
   readonly acknowledgedAt: Date | null;
 }
@@ -55,6 +67,11 @@ export function alreadyWaiting(
       (call) => call.sessionId === sessionId && call.reason === reason && isPending(call),
     ) ?? null
   );
+}
+
+/** Whether the waiter should take the card reader to the table. */
+export function needsCardReader(call: TableCall): boolean {
+  return call.reason === 'BILL' && call.paymentMethod === 'CARD';
 }
 
 export function acknowledge(call: TableCall, at: Date): TableCall {
