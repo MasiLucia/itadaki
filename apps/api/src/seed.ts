@@ -28,6 +28,18 @@ async function main(): Promise<void> {
   }
   console.log('schema applied');
 
+  // The demo tenant, before anything references it.
+  //
+  // Migration 002 backfills tenants from existing products, which covers a
+  // database that already had data but leaves a brand new one empty — and
+  // every catalog row below has a foreign key to this table.
+  await client.query(
+    `INSERT INTO tenants (id, name, slug)
+     VALUES ($1, $2, $1)
+     ON CONFLICT (id) DO NOTHING`,
+    [TENANT_ID, 'Restaurante demo'],
+  );
+
   await client.query('SELECT set_config($1, $2, false)', ['app.tenant_id', TENANT_ID]);
 
   // The fixture is the whole demo catalog, not an addition to it: upserting

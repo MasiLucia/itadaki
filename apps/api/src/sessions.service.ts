@@ -2,6 +2,7 @@ import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/com
 import { type SessionReader, type SessionWriter } from '@itadaki/ordering/application';
 import { InMemorySessionStore, PostgresSessionStore } from '@itadaki/ordering/infra';
 import { database } from './database';
+import { log } from './logger';
 
 /**
  * How long a table may sit open before it is considered abandoned.
@@ -41,7 +42,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
     const closed = await this.store.closeStale(STALE_AFTER_HOURS);
     if (closed.isOk() && closed.value > 0) {
-      console.log(`sesiones abandonadas cerradas: ${closed.value}`);
+      log.info('abandoned sessions closed', { closed: closed.value });
     }
   }
 }

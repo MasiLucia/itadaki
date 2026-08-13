@@ -10,10 +10,13 @@ Requiere Node 22+ y Docker (para Postgres).
 
 ```bash
 npm install
-npm run db:up      # levanta postgres en el puerto 5433
+npm run db:up      # levanta postgres en el puerto 5433 (docker compose)
 npm run db:seed    # aplica las migraciones y carga una carta de ejemplo
-npm run start:api  # API en :3100
+npm run start:api  # API en :3000
 ```
+
+`db:up` crea la base desde cero, rol de aplicación incluido: no hace falta
+ningún paso manual. Si algo quedó raro, `npm run db:reset` la rehace vacía.
 
 Después, cada app en su terminal:
 

@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { USING_DEV_SECRET } from './auth';
 import { databaseAvailable } from './database';
+import { log } from './logger';
 import { ErrorFilter } from './error.filter';
 
 const PORT = Number(process.env['PORT'] ?? 3000);
@@ -48,22 +49,39 @@ async function bootstrap(): Promise<void> {
   // Base64 originals ride in the JSON body; 15 MB of binary is ~20 MB encoded.
   app.useBodyParser('json', { limit: '25mb' });
   app.setGlobalPrefix('api');
-  await app.listen(PORT);
 
+  // Checked before listening: an instance that cannot reach Postgres cannot
+  // take an order, and coming up anyway means a deploy looks healthy while
+  // every table gets an error. In production that is a failed boot, so the
+  // orchestrator keeps the previous version serving instead.
   const usingPostgres = process.env['USE_POSTGRES'] !== 'false';
   const reachable = usingPostgres ? await databaseAvailable() : false;
+
+  if (usingPostgres && !reachable) {
+    const detail = 'postgres UNREACHABLE — check DATABASE_URL, or set USE_POSTGRES=false';
+    if (process.env['NODE_ENV'] === 'production') {
+      throw new Error(detail);
+    }
+    // Locally a demo without the database still beats refusing to start.
+    log.warn(detail);
+  }
+
+  await app.listen(PORT);
+
   const storage = usingPostgres
     ? reachable
       ? 'postgres'
       : 'postgres UNREACHABLE — set USE_POSTGRES=false to run in memory'
     : 'in-memory (data is lost on restart)';
 
-  console.log(`itadaki api listening on http://localhost:${PORT}/api`);
-  console.log(`storage: ${storage}`);
-  console.log(`cors: ${origins.join(', ')}`);
+  log.info('api listening', {
+    url: `http://localhost:${PORT}/api`,
+    storage,
+    cors: origins.join(', '),
+  });
 
   if (USING_DEV_SECRET) {
-    console.warn('auth: using the development signing key — set AUTH_SECRET before deploying');
+    log.warn('using the development signing key — set AUTH_SECRET before deploying');
   }
 }
 

@@ -4,14 +4,21 @@ export interface TablePayload {
   readonly tenantId: string;
   readonly tableId: string;
   readonly issuedAt: number;
-  readonly expiresAt: number;
+  /**
+   * When the token stops working, or absent for one that never does.
+   *
+   * A QR printed on a sticker has to keep working tomorrow: the diner cannot
+   * "scan it again" when the paper on their table is the thing that expired.
+   * Those tokens carry no expiry, and rotating the table's secret is what
+   * invalidates them.
+   */
+  readonly expiresAt?: number;
 }
 
 /**
- * How long a scanned QR stays valid.
+ * How long a token minted for one visit stays valid.
  *
- * Long enough that a diner is never kicked out mid-meal, short enough that a
- * photo of the QR posted online stops working the same day.
+ * Applies to links handed out per session, never to a printed QR.
  */
 export const TABLE_TOKEN_HOURS = 8;
 
@@ -74,19 +81,24 @@ export function verifyTableToken(
     if (
       typeof candidate['tenantId'] !== 'string' ||
       typeof candidate['tableId'] !== 'string' ||
-      typeof candidate['issuedAt'] !== 'number' ||
-      typeof candidate['expiresAt'] !== 'number'
+      typeof candidate['issuedAt'] !== 'number'
     ) {
       return null;
     }
 
-    if (candidate['expiresAt'] <= now.getTime()) return null;
+    // Absent means a printed QR, which never expires on its own. Anything
+    // present but not a number is a malformed token, not a permanent one.
+    const expiresAt = candidate['expiresAt'];
+    if (expiresAt !== undefined) {
+      if (typeof expiresAt !== 'number') return null;
+      if (expiresAt <= now.getTime()) return null;
+    }
 
     return {
       tenantId: candidate['tenantId'],
       tableId: candidate['tableId'],
       issuedAt: candidate['issuedAt'],
-      expiresAt: candidate['expiresAt'],
+      ...(expiresAt === undefined ? {} : { expiresAt }),
     };
   } catch {
     return null;

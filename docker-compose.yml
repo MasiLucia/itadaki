@@ -1,0 +1,32 @@
+# Postgres for local development.
+#
+# Port 5433 rather than the default 5432: a laptop that already runs Postgres
+# for something else should not have to stop it to work on Itadaki.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: itadaki-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: itadaki
+      # Owner used by migrations and seeding. The app itself connects as
+      # itadaki_app, a lesser role that row level security applies to.
+      POSTGRES_USER: itadaki
+      POSTGRES_PASSWORD: itadaki
+    ports:
+      - '5433:5432'
+    volumes:
+      - itadaki-db:/var/lib/postgresql/data
+      # Runs once, on an empty data directory: creates the application role
+      # that every migration GRANTs to.
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      # `npm run db:seed` right after `up` fails otherwise: the container is
+      # listening a second before Postgres will accept a connection.
+      test: ['CMD-SHELL', 'pg_isready -U itadaki -d itadaki']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  itadaki-db:

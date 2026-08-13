@@ -13,14 +13,28 @@ import { databaseAvailable } from './database';
 export class HealthController {
   private readonly startedAt = Date.now();
 
-  /** Cheap liveness probe: the process is up and answering. */
+  /**
+   * Liveness, and honest about the database.
+   *
+   * Strictly, liveness only asks whether the process is up — but whoever wires
+   * a load balancer reaches for `/health` first, and an instance that cannot
+   * reach Postgres cannot take an order. Answering "ok" there sends real
+   * diners to an API that will fail every request, so this probe answers 503
+   * for the same reason `/ready` does. The uptime still tells a human that the
+   * process itself is alive.
+   */
   @Public()
   @Get()
-  live() {
-    return {
-      status: 'ok',
-      uptimeSeconds: Math.floor((Date.now() - this.startedAt) / 1000),
-    };
+  async live(@Res({ passthrough: true }) response: Response) {
+    const uptimeSeconds = Math.floor((Date.now() - this.startedAt) / 1000);
+    const usingPostgres = process.env['USE_POSTGRES'] !== 'false';
+    const database = usingPostgres ? await databaseAvailable() : true;
+
+    if (!database) {
+      response.status(HttpStatus.SERVICE_UNAVAILABLE);
+      return { status: 'degraded', database: false, uptimeSeconds };
+    }
+    return { status: 'ok', database: true, uptimeSeconds };
   }
 
   /**

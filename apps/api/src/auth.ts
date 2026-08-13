@@ -317,31 +317,34 @@ export const Scope = createParamDecorator((_data: unknown, context: ExecutionCon
 });
 
 /**
- * Tenant for the current request.
+ * Tenant for the current request, taken from a verified staff session.
  *
- * A verified staff session always wins. The `?tenant=` fallback that remains
- * is only sound for endpoints that expose nothing table-specific — the public
- * carte, which a diner has to be able to read before scanning anything.
- *
- * Do not reach for this on a route that touches a session, a bill or an order:
- * the parameter is caller-supplied, so it would let anyone pick the restaurant
- * they are asking about. Those routes use `@TableScoped()` + `@Scope()`, which
- * derive the tenant from a signed token instead.
+ * Throws when there is none. A caller-supplied `?tenant=` must never decide
+ * whose data is served: the one route that legitimately needs it — the public
+ * carte, which a diner reads before scanning anything — asks for it by name
+ * with `@TenantId({ publicFallback: true })`, so the exception is visible at
+ * the route rather than inherited silently by the next one written.
  */
-export const TenantId = createParamDecorator((_data: unknown, context: ExecutionContext) => {
-  const request = context.switchToHttp().getRequest<AuthedRequest>();
-  if (request.auth !== undefined) {
-    return request.auth.tenantId;
-  }
-
-  const header = request.headers.authorization ?? '';
-  if (header.startsWith('Bearer ')) {
-    const payload = verifyToken(header.slice(7), AUTH_SECRET, new Date());
-    if (payload !== null) {
-      return payload.tenantId;
+export const TenantId = createParamDecorator(
+  (options: { publicFallback?: boolean } | undefined, context: ExecutionContext) => {
+    const request = context.switchToHttp().getRequest<AuthedRequest>();
+    if (request.auth !== undefined) {
+      return request.auth.tenantId;
     }
-  }
 
-  const fromQuery = request.query['tenant'];
-  return typeof fromQuery === 'string' && fromQuery !== '' ? fromQuery : DEFAULT_TENANT;
-});
+    const header = request.headers.authorization ?? '';
+    if (header.startsWith('Bearer ')) {
+      const payload = verifyToken(header.slice(7), AUTH_SECRET, new Date());
+      if (payload !== null) {
+        return payload.tenantId;
+      }
+    }
+
+    if (options?.publicFallback !== true) {
+      throw new UnauthorizedException({ kind: 'TENANT_UNRESOLVED' });
+    }
+
+    const fromQuery = request.query['tenant'];
+    return typeof fromQuery === 'string' && fromQuery !== '' ? fromQuery : DEFAULT_TENANT;
+  },
+);

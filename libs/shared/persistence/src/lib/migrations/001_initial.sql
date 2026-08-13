@@ -125,6 +125,20 @@ CREATE TABLE IF NOT EXISTS images (
   PRIMARY KEY (tenant_id, id)
 );
 
+-- The role the API connects as, which every GRANT below targets.
+--
+-- Created here when absent so migrating a fresh database never depends on
+-- someone having run a setup step by hand. Docker Compose creates it too;
+-- both paths are idempotent.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'itadaki_app') THEN
+    CREATE ROLE itadaki_app LOGIN PASSWORD 'itadaki_app';
+  END IF;
+END $$;
+
+GRANT USAGE ON SCHEMA public TO itadaki_app;
+
 -- Row level security. Every policy compares against app.tenant_id, which the
 -- connection sets per request; a query that forgets the tenant returns nothing
 -- rather than another restaurant's rows.
@@ -144,5 +158,16 @@ BEGIN
        WITH CHECK (tenant_id = current_setting(''app.tenant_id'', true))',
       target
     );
+
+    -- The role the API connects as. Granted here rather than by hand, so a
+    -- database created from scratch works without anyone remembering this:
+    -- row level security above is what keeps the access tenant-scoped.
+    EXECUTE format(
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO itadaki_app',
+      target
+    );
   END LOOP;
 END $$;
+
+-- price_audit uses a bigserial, and INSERT on it needs the sequence too.
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO itadaki_app;

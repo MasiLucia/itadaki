@@ -125,7 +125,7 @@ export class ImagesController {
     @Param('id') imageId: string,
     @Param('file') file: string,
     @Res() response: Response,
-    @TenantId() tenantId: string,
+    @TenantId({ publicFallback: true }) tenantId: string,
   ): Promise<void> {
     const extension = file.split('.').pop() ?? '';
     if (!['avif', 'webp', 'jpeg'].includes(extension)) {

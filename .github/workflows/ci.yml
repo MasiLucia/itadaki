@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Tests
+        run: npx jest --ci
+
+      - name: Build API
+        run: npm run build:api
+
+      - name: Build apps
+        run: |
+          npx ng build diner-pwa
+          npx ng build kds-web
+          npx ng build admin-web
+          npx ng build floor-web
+
+  # The API has to start from `dependencies` alone. Catching this in CI is the
+  # point: a runtime package left in devDependencies installs fine here and
+  # fails only on the server, where the build step never runs.
+  production-install:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build:api
+
+      - name: Reinstall without dev dependencies
+        run: npm ci --omit=dev
+
+      - name: Boot the API
+        env:
+          USE_POSTGRES: 'false'
+          PORT: '3000'
+        run: |
+          node dist/api/apps/api/src/main.js &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/api/health > /dev/null; then
+              echo "api answered"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "api never answered"
+          exit 1

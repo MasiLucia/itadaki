@@ -42,7 +42,7 @@ export class MenuController {
   // The carte is public: a diner scans a QR and has no account.
   @Public()
   @Get()
-  async getMenu(@TenantId() tenantId: string) {
+  async getMenu(@TenantId({ publicFallback: true }) tenantId: string) {
     const [categories, products] = await Promise.all([
       this.catalog.categories.list(tenantId),
       this.catalog.products.list(tenantId, {}),

@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import {
   type TablePayload,
   newTableSecret,
@@ -80,5 +81,48 @@ describe('table tokens', () => {
   it('generates distinct secrets', () => {
     const secrets = new Set(Array.from({ length: 20 }, () => newTableSecret()));
     expect(secrets.size).toBe(20);
+  });
+});
+
+describe('the QR printed on the table', () => {
+  /** A year later the sticker is still on the same table. */
+  const MUCH_LATER = new Date('2027-06-01T13:00:00Z');
+
+  const printed = (overrides: Partial<TablePayload> = {}): TablePayload => ({
+    tenantId: 'itadaki',
+    tableId: 'mesa-07',
+    issuedAt: NOW.getTime(),
+    ...overrides,
+  });
+
+  it('still works long after it was printed', () => {
+    // The diner cannot "scan it again" when the paper is what went stale.
+    const token = signTableToken(printed(), SECRET_A);
+    expect(verifyTableToken(token, SECRET_A, MUCH_LATER)?.tableId).toBe('mesa-07');
+  });
+
+  it('carries no expiry at all', () => {
+    const token = signTableToken(printed(), SECRET_A);
+    expect(verifyTableToken(token, SECRET_A, NOW)?.expiresAt).toBeUndefined();
+  });
+
+  it('stops working once the table secret is rotated', () => {
+    // Rotating is what invalidates a printed QR, since time no longer does.
+    const token = signTableToken(printed(), SECRET_A);
+    expect(verifyTableToken(token, SECRET_B, MUCH_LATER)).toBeNull();
+  });
+
+  it('is still bound to its own table', () => {
+    const token = signTableToken(printed({ tableId: 'mesa-09' }), SECRET_A);
+    expect(verifyTableToken(token, SECRET_A, MUCH_LATER)?.tableId).toBe('mesa-09');
+  });
+
+  it('rejects a token whose expiry is present but malformed', () => {
+    // Absent means permanent; garbage means broken, and must not read as permanent.
+    const body = Buffer.from(
+      JSON.stringify({ ...printed(), expiresAt: 'nunca' }),
+    ).toString('base64url');
+    const signature = createHmac('sha256', SECRET_A).update(body).digest('base64url');
+    expect(verifyTableToken(`${body}.${signature}`, SECRET_A, NOW)).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpException, HttpStatus, Param, Post } from '@nestjs/common';
-import { PostgresTableStore, TABLE_TOKEN_HOURS, signTableToken } from '@itadaki/identity/infra';
+import { PostgresTableStore, signTableToken } from '@itadaki/identity/infra';
 import { z } from 'zod';
 import { RequirePermission, TenantId } from './auth';
 import { database } from './database';
@@ -83,16 +83,15 @@ export class TablesController {
     };
   }
 
+  /**
+   * The link that goes on the printed QR.
+   *
+   * Deliberately without an expiry: the sticker on the table has to still work
+   * next month, and a diner cannot "scan it again" when the paper itself is
+   * what went stale. Rotating the table's secret is what invalidates it.
+   */
   private linkFor(tenantId: string, tableId: string, secret: string, now: number): string {
-    const token = signTableToken(
-      {
-        tenantId,
-        tableId,
-        issuedAt: now,
-        expiresAt: now + TABLE_TOKEN_HOURS * 3_600_000,
-      },
-      secret,
-    );
+    const token = signTableToken({ tenantId, tableId, issuedAt: now }, secret);
     return `${DINER_APP_URL}/bienvenida?t=${encodeURIComponent(token)}`;
   }
 }
