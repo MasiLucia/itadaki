@@ -128,7 +128,8 @@ export class FloorStore {
 
     this.socket.on('connect', () => {
       this.connected.set(true);
-      this.socket?.emit('join', { tenantId: this.auth.profile()?.tenantId ?? '' });
+      // The server reads the restaurant from the token, not from us.
+      this.socket?.emit('join', { token: this.auth.token() ?? '' });
       // Queued taps go out before the board reloads, so the refresh cannot
       // paint the server's older view over what the waiter already did.
       void this.outbox.flush().then(() => void this.refresh());

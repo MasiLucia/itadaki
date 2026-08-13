@@ -1,4 +1,11 @@
-import { MIN_PASSWORD_LENGTH, isSessionValid, normaliseEmail, validateCredentials } from './staff';
+import {
+  MIN_PASSWORD_LENGTH,
+  isSessionValid,
+  isTooCommon,
+  normaliseEmail,
+  validateCredentials,
+  validatePassword,
+} from './staff';
 import { PERMISSIONS, ROLES, can, isRole, permissionsOf } from './role';
 
 describe('roles and permissions', () => {
@@ -90,5 +97,39 @@ describe('session expiry', () => {
   it('is invalid after expiry', () => {
     const now = new Date('2026-01-01T20:00:00Z');
     expect(isSessionValid(session(new Date('2026-01-01T19:59:59Z')), now)).toBe(false);
+  });
+});
+
+describe('the passwords an attacker tries first', () => {
+  it('turns away the obvious ones even at the right length', () => {
+    // Eight characters of "password" is still the first guess anyone makes.
+    const result = validatePassword('password');
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error.kind).toBe('PASSWORD_TOO_COMMON');
+  });
+
+  it('is not fooled by capitals or padding', () => {
+    expect(isTooCommon('PASSWORD')).toBe(true);
+    expect(isTooCommon('  12345678  ')).toBe(true);
+  });
+
+  it('turns away a guess built from this product', () => {
+    // The restaurant's own name is the second thing anyone tries.
+    expect(isTooCommon('itadaki123')).toBe(true);
+  });
+
+  it('accepts an ordinary password someone actually chose', () => {
+    expect(validatePassword('milanesa-con-pure').isOk()).toBe(true);
+  });
+
+  it('applies on signup too, not only on reset', () => {
+    const result = validateCredentials('dueño@resto.test', '12345678');
+    expect(result.isErr() && result.error.kind).toBe('PASSWORD_TOO_COMMON');
+  });
+
+  it('still reports a short password as short', () => {
+    // The more specific message is the more useful one.
+    const result = validatePassword('abc');
+    expect(result.isErr() && result.error.kind).toBe('PASSWORD_TOO_SHORT');
   });
 });

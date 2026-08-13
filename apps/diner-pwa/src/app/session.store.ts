@@ -152,7 +152,9 @@ export class SessionStore {
 
     this.socket.on('connect', () => {
       this.connected.set(true);
-      this.socket?.emit('join-session', { sessionId });
+      // The QR proves which table this is; knowing a session id is not
+      // enough to listen in on someone else's table.
+      this.socket?.emit('join-session', { sessionId, tableToken: this.table.token() ?? '' });
       void this.refresh(sessionId);
       this.orderListeners.forEach((notify) => notify());
     });

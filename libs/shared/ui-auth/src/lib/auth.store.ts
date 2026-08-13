@@ -83,6 +83,8 @@ export class AuthStore {
             ? 'Ya hay una cuenta con ese email'
             : detail?.kind === 'PASSWORD_TOO_SHORT'
               ? 'La contraseña necesita al menos 8 caracteres'
+              : detail?.kind === 'PASSWORD_TOO_COMMON'
+                ? 'Esa contraseña es de las primeras que prueban; elegí otra'
               : detail?.kind === 'INVALID_EMAIL'
                 ? 'Revisá el email'
                 : detail?.kind === 'NAME_TOO_SHORT' || detail?.kind === 'NAME_NOT_USABLE'
@@ -140,7 +142,9 @@ export class AuthStore {
         this.error.set(
           detail?.kind === 'PASSWORD_TOO_SHORT'
             ? 'La contraseña necesita al menos 8 caracteres'
-            : 'El link venció o ya se usó. Pedí uno nuevo.',
+            : detail?.kind === 'PASSWORD_TOO_COMMON'
+              ? 'Esa contraseña es de las primeras que prueban; elegí otra'
+              : 'El link venció o ya se usó. Pedí uno nuevo.',
         );
         return false;
       }

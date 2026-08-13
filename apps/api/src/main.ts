@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { type ServerResponse } from 'node:http';
 import { type NestExpressApplication } from '@nestjs/platform-express';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -44,6 +45,30 @@ async function bootstrap(): Promise<void> {
     // The diner app sends its table token on every scoped request.
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Table-Token', 'Idempotency-Key'],
   });
+  // Express announces itself by default, which tells an attacker what to
+  // look up known bugs for.
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
+
+  // Baseline response headers.
+  //
+  // Written by hand rather than pulling in helmet: this is an API that serves
+  // JSON and cached image bytes, so most of what helmet sets would not apply.
+  // What matters here is that a browser never sniffs a response into something
+  // executable, and that the API cannot be framed.
+  app.use((_request: unknown, response: ServerResponse, next: () => void) => {
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('X-Frame-Options', 'DENY');
+    response.setHeader('Referrer-Policy', 'no-referrer');
+    // Nothing here is meant to be embedded or scripted; the apps are separate.
+    response.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+    // Only meaningful over TLS, and only set there: sending it in development
+    // would pin a browser to https://localhost.
+    if (process.env['NODE_ENV'] === 'production') {
+      response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
+
   // Renders unhandled errors as a plain 500 instead of leaking a stack trace.
   app.useGlobalFilters(new ErrorFilter());
   // Base64 originals ride in the JSON body; 15 MB of binary is ~20 MB encoded.

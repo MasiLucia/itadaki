@@ -14,6 +14,7 @@ export {
   MIN_PASSWORD_LENGTH,
   normaliseEmail,
   validateCredentials,
+  isTooCommon,
   validatePassword,
   isSessionValid,
 } from './lib/staff';

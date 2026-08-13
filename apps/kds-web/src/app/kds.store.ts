@@ -88,7 +88,8 @@ export class KdsStore {
 
     this.socket.on('connect', () => {
       this.connected.set(true);
-      this.socket?.emit('join', { tenantId: this.auth.profile()?.tenantId ?? '' });
+      // The server reads the restaurant from the token, not from us.
+      this.socket?.emit('join', { token: this.auth.token() ?? '' });
       // Anything tapped during the outage goes out before the board reloads,
       // so the refresh does not paint over it with the server's older view.
       void this.outbox.flush().then(() => {

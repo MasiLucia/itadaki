@@ -14,6 +14,18 @@ import {
   type SessionEventPublisher,
 } from '@itadaki/ordering/application';
 import { type Server, type Socket } from 'socket.io';
+import { verifyToken } from '@itadaki/identity/infra';
+import { InMemorySessionStore, PostgresSessionStore } from '@itadaki/ordering/infra';
+import { AUTH_SECRET, resolveTableToken } from './auth';
+import { database } from './database';
+
+/** The bearer a client may present on the socket handshake. */
+function bearerOf(client: Socket): string | null {
+  const raw =
+    client.handshake.auth?.['token'] ?? client.handshake.headers.authorization ?? '';
+  if (typeof raw !== 'string' || raw === '') return null;
+  return raw.startsWith('Bearer ') ? raw.slice(7) : raw;
+}
 
 // Same origin list as the HTTP API; `origin: true` would let any page open a
 // socket and subscribe to a restaurant's live orders.
@@ -36,29 +48,84 @@ export class RealtimeGateway
   @WebSocketServer()
   private server?: Server;
 
-  /** A client must join before it receives anything. */
-  @SubscribeMessage('join')
-  handleJoin(
-    @MessageBody() body: { tenantId?: unknown },
-    @ConnectedSocket() client: Socket,
-  ): { joined: string } | { error: string } {
-    const tenantId = typeof body?.tenantId === 'string' ? body.tenantId : '';
-    if (tenantId === '') {
-      return { error: 'tenantId required' };
-    }
-    void client.join(`tenant:${tenantId}`);
-    return { joined: tenantId };
+  /**
+   * Own store rather than an injected service: the services already publish
+   * through this gateway, so depending on one back would be a cycle.
+   */
+  private readonly sessions =
+    process.env['USE_POSTGRES'] !== 'false'
+      ? new PostgresSessionStore(database)
+      : new InMemorySessionStore();
+
+  /** Whether that session really belongs to the table the QR proves. */
+  private async sessionBelongsTo(
+    tenantId: string,
+    sessionId: string,
+    tableId: string,
+  ): Promise<boolean> {
+    const found = await this.sessions.findById(tenantId, sessionId);
+    return found.isOk() && found.value.session.tableId === tableId;
   }
 
-  @SubscribeMessage('join-session')
-  handleJoinSession(
-    @MessageBody() body: { sessionId?: unknown },
+  /**
+   * Joins the room for one restaurant, for staff only.
+   *
+   * The tenant comes from the caller's signed session, never from the message:
+   * asking to join `tenant:X` used to be enough to watch another restaurant's
+   * orders arrive in real time, with no account at all. CORS does not help
+   * here — a socket opened outside a browser sends no origin.
+   */
+  @SubscribeMessage('join')
+  handleJoin(
+    @MessageBody() body: { token?: unknown },
     @ConnectedSocket() client: Socket,
   ): { joined: string } | { error: string } {
+    const token = typeof body?.token === 'string' ? body.token : bearerOf(client);
+    const session = token === null ? null : verifyToken(token, AUTH_SECRET, new Date());
+    if (session === null) {
+      return { error: 'unauthorized' };
+    }
+
+    void client.join(`tenant:${session.tenantId}`);
+    return { joined: session.tenantId };
+  }
+
+  /**
+   * Joins the room for one table's session.
+   *
+   * Diners have no account, so the signed table token stands in: it proves the
+   * caller scanned that table's QR, and the session is checked to belong to
+   * that same table. Knowing a session id is not enough.
+   */
+  @SubscribeMessage('join-session')
+  async handleJoinSession(
+    @MessageBody() body: { sessionId?: unknown; tableToken?: unknown },
+    @ConnectedSocket() client: Socket,
+  ): Promise<{ joined: string } | { error: string }> {
     const sessionId = typeof body?.sessionId === 'string' ? body.sessionId : '';
     if (sessionId === '') {
       return { error: 'sessionId required' };
     }
+
+    // Staff watching a table from the floor screen is legitimate too.
+    const bearer = bearerOf(client);
+    const staff = bearer === null ? null : verifyToken(bearer, AUTH_SECRET, new Date());
+    if (staff !== null) {
+      void client.join(`session:${sessionId}`);
+      return { joined: sessionId };
+    }
+
+    const tableToken = typeof body?.tableToken === 'string' ? body.tableToken : undefined;
+    const table = await resolveTableToken(tableToken);
+    if (table === null) {
+      return { error: 'unauthorized' };
+    }
+
+    const owned = await this.sessionBelongsTo(table.tenantId, sessionId, table.tableId);
+    if (!owned) {
+      return { error: 'unauthorized' };
+    }
+
     void client.join(`session:${sessionId}`);
     return { joined: sessionId };
   }
