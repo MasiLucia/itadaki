@@ -1,9 +1,11 @@
+import { apiUrl, socketUrl } from '@itadaki/shared/domain';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { AuthStore } from '@itadaki/shared/ui-auth';
+import { OutboxDb } from '@itadaki/shared/offline';
 import { io, type Socket } from 'socket.io-client';
 
-const API = 'http://localhost:3100/api';
-const WS = 'http://localhost:3100';
+const API = apiUrl();
+const WS = socketUrl();
 
 export interface CallDto {
   readonly id: string;
@@ -11,6 +13,9 @@ export interface CallDto {
   readonly tableId: string;
   readonly reason: 'WAITER' | 'BILL' | 'QUESTION';
   readonly note: string;
+  readonly paymentMethod: 'CARD' | 'CASH' | 'UNDECIDED' | null;
+  /** The API decides this so every screen says the same thing. */
+  readonly needsCardReader: boolean;
   readonly raisedAt: string;
 }
 
@@ -53,6 +58,33 @@ export class FloorStore {
   private socket: Socket | null = null;
 
   readonly calls = signal<readonly CallDto[]>([]);
+
+  /** Taps made with no signal, still waiting to reach the API. */
+  readonly pending = signal(0);
+
+  /**
+   * The floor loses signal too — a phone walking between the bar and the back
+   * tables drops more often than a fixed tablet does. A waiter who marks a
+   * plate delivered and sees nothing happen will walk back to check.
+   */
+  private readonly outbox = new OutboxDb({
+    dbName: 'itadaki-floor',
+    send: async (entry) => {
+      const response = await fetch(entry.url, {
+        method: entry.method,
+        headers: {
+          ...this.auth.headers(),
+          'Content-Type': 'application/json',
+          'Idempotency-Key': entry.id,
+        },
+        body: JSON.stringify(entry.body),
+      });
+      this.auth.expired(response);
+      return response;
+    },
+    onCount: (pending) => this.pending.set(pending),
+    onOffline: () => this.connected.set(false),
+  });
   readonly tickets = signal<readonly TicketDto[]>([]);
   readonly connected = signal(false);
 
@@ -88,16 +120,26 @@ export class FloorStore {
     if (this.socket !== null) return;
 
     void this.refresh();
+    void this.outbox.start();
+
+    globalThis.addEventListener('online', () => void this.outbox.flush());
+
     this.socket = io(WS, { transports: ['websocket', 'polling'] });
 
     this.socket.on('connect', () => {
       this.connected.set(true);
       this.socket?.emit('join', { tenantId: this.auth.profile()?.tenantId ?? '' });
-      void this.refresh();
+      // Queued taps go out before the board reloads, so the refresh cannot
+      // paint the server's older view over what the waiter already did.
+      void this.outbox.flush().then(() => void this.refresh());
     });
     this.socket.on('disconnect', () => this.connected.set(false));
-    this.socket.on('order.changed', () => void this.refresh());
-    this.socket.on('call.changed', () => void this.refresh());
+    this.socket.on('order.changed', () => {
+      if (this.pending() === 0) void this.refresh();
+    });
+    this.socket.on('call.changed', () => {
+      if (this.pending() === 0) void this.refresh();
+    });
   }
 
   disconnect(): void {
@@ -113,6 +155,10 @@ export class FloorStore {
         fetch(`${API}/orders`, { headers: this.auth.headers() }),
       ]);
 
+      // A shift long enough to outlive the session ends here rather than
+      // leaving the board frozen on its last good data.
+      if (this.auth.expired(calls) || this.auth.expired(orders)) return;
+
       if (calls.ok) this.calls.set((await calls.json()) as CallDto[]);
       if (orders.ok) this.tickets.set((await orders.json()) as TicketDto[]);
     } catch {
@@ -122,24 +168,34 @@ export class FloorStore {
 
   /** Clears a call once the waiter is on their way. */
   async attend(callId: string): Promise<void> {
-    const response = await fetch(`${API}/calls/${callId}/acknowledge`, {
-      method: 'PATCH',
-      headers: this.auth.headers(),
-    });
-    if (response.ok) await this.refresh();
+    // Painted at once: the waiter is already walking to the table.
+    this.calls.update((calls) => calls.filter((call) => call.id !== callId));
+
+    await this.outbox.enqueue(`${API}/calls/${callId}/acknowledge`, 'PATCH', {});
+    if (this.pending() === 0) await this.refresh();
   }
 
   /** Marks a dish as carried out to the table. */
   async deliver(orderId: string, itemId: string): Promise<void> {
-    const response = await fetch(`${API}/orders/${orderId}/status`, {
-      method: 'PATCH',
-      headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        next: 'DELIVERED',
-        itemId,
-        actorId: this.auth.profile()?.displayName ?? 'mozo',
-      }),
+    // Drops off the pickup list immediately; the plate is already on its way.
+    this.tickets.update((tickets) =>
+      tickets.map((ticket) =>
+        ticket.id !== orderId
+          ? ticket
+          : {
+              ...ticket,
+              items: ticket.items.map((item) =>
+                item.id === itemId ? { ...item, status: 'DELIVERED' } : item,
+              ),
+            },
+      ),
+    );
+
+    await this.outbox.enqueue(`${API}/orders/${orderId}/status`, 'PATCH', {
+      next: 'DELIVERED',
+      itemId,
+      actorId: this.auth.profile()?.displayName ?? 'mozo',
     });
-    if (response.ok) await this.refresh();
+    if (this.pending() === 0) await this.refresh();
   }
 }

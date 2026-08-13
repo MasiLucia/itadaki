@@ -7,3 +7,13 @@ void bootstrapApplication(FloorComponent, {
 }).catch((error: unknown) => {
   console.error('bootstrap failed', error);
 });
+
+// A reload during an outage must still open the screen; the outbox keeps the
+// taps safe either way.
+if ('serviceWorker' in navigator) {
+  globalThis.addEventListener('load', () => {
+    void navigator.serviceWorker.register('sw.js').catch(() => {
+      // Without it the screen simply needs a connection to load; not fatal.
+    });
+  });
+}

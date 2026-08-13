@@ -14,3 +14,4 @@ export {
   RateLimiter,
 } from './lib/rate-limit';
 export { type TableBlock, type FailedResponse, blockFrom } from './lib/table-block';
+export { apiOrigin, apiUrl, socketUrl } from './lib/api-origin';

@@ -225,7 +225,7 @@ export class MetricsComponent {
   }
 
   private async load(): Promise<void> {
-    const response = await fetch(`${this.apiUrl()}/metrics?days=${this.days()}`, {
+    const response = await this.auth.apiFetch(`${this.apiUrl()}/metrics?days=${this.days()}`, {
       headers: this.auth.headers(),
     });
     if (response.ok) {

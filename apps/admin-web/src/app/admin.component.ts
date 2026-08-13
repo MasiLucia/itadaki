@@ -1,3 +1,4 @@
+import { apiUrl } from '@itadaki/shared/domain';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { type ImageEditParams } from '@itadaki/catalog/domain';
 import { ImageEditorComponent } from '@itadaki/shared/ui-image-editor';
@@ -5,7 +6,7 @@ import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
 import { QrSheetComponent } from './qr-sheet.component';
 import { MetricsComponent } from './metrics.component';
 
-const API = 'http://localhost:3100/api';
+const API = apiUrl();
 
 interface MenuProduct {
   id: string;
@@ -471,7 +472,7 @@ export class AdminComponent {
   }
 
   private async load(): Promise<void> {
-    const response = await fetch(`${API}/menu`, { headers: this.auth.headers() });
+    const response = await this.auth.apiFetch(`${API}/menu`, { headers: this.auth.headers() });
     if (!response.ok) return;
 
     const menu = (await response.json()) as {
@@ -486,7 +487,7 @@ export class AdminComponent {
   }
 
   private async loadTables(): Promise<void> {
-    const response = await fetch(`${API}/tables`, { headers: this.auth.headers() });
+    const response = await this.auth.apiFetch(`${API}/tables`, { headers: this.auth.headers() });
     if (response.ok) {
       this.tables.set((await response.json()) as RestaurantTable[]);
     }
@@ -498,7 +499,7 @@ export class AdminComponent {
     const label = String(new FormData(form).get('label') ?? '').trim();
     if (label === '') return;
 
-    const response = await fetch(`${API}/tables`, {
+    const response = await this.auth.apiFetch(`${API}/tables`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this.auth.headers() },
       body: JSON.stringify({ label }),
@@ -566,7 +567,7 @@ export class AdminComponent {
     const pesos = Number((event.target as HTMLInputElement).value);
     if (!Number.isFinite(pesos) || pesos < 0) return;
 
-    const response = await fetch(`${API}/menu/products/${productId}`, {
+    const response = await this.auth.apiFetch(`${API}/menu/products/${productId}`, {
       method: 'PATCH',
       headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ priceMinor: Math.round(pesos * 100) }),
@@ -584,7 +585,7 @@ export class AdminComponent {
   }
 
   private async loadTrial(): Promise<void> {
-    const response = await fetch(`${API}/auth/subscription`, { headers: this.auth.headers() });
+    const response = await this.auth.apiFetch(`${API}/auth/subscription`, { headers: this.auth.headers() });
     if (response.ok) {
       this.trial.set((await response.json()) as { status: string; daysLeft: number | null });
     }
@@ -593,7 +594,7 @@ export class AdminComponent {
   private async loadStaff(): Promise<void> {
     if (!this.auth.can('staff:manage')) return;
 
-    const response = await fetch(`${API}/staff`, { headers: this.auth.headers() });
+    const response = await this.auth.apiFetch(`${API}/staff`, { headers: this.auth.headers() });
     if (response.ok) {
       this.staff.set((await response.json()) as StaffMember[]);
     }
@@ -613,7 +614,7 @@ export class AdminComponent {
     };
     if (payload.displayName === '' || payload.email === '' || payload.password === '') return;
 
-    const response = await fetch(`${API}/staff`, {
+    const response = await this.auth.apiFetch(`${API}/staff`, {
       method: 'POST',
       headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -646,7 +647,7 @@ export class AdminComponent {
       if (!ok) return;
     }
 
-    const response = await fetch(`${API}/staff/${member.id}/active`, {
+    const response = await this.auth.apiFetch(`${API}/staff/${member.id}/active`, {
       method: 'PATCH',
       headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ active: !member.active }),
@@ -666,7 +667,7 @@ export class AdminComponent {
     );
     if (!ok) return;
 
-    const response = await fetch(`${API}/tables/${table.id}/rotate`, {
+    const response = await this.auth.apiFetch(`${API}/tables/${table.id}/rotate`, {
       method: 'POST',
       headers: this.auth.headers(),
     });
@@ -709,7 +710,7 @@ export class AdminComponent {
     const name = String(new FormData(form).get('name') ?? '').trim();
     if (name === '') return;
 
-    const response = await fetch(`${API}/menu/categories`, {
+    const response = await this.auth.apiFetch(`${API}/menu/categories`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this.auth.headers() },
       body: JSON.stringify({ name }),
@@ -728,7 +729,7 @@ export class AdminComponent {
     const current = this.categories().find((category) => category.id === categoryId);
     if (name === '' || current === undefined || name === current.name) return;
 
-    const response = await fetch(`${API}/menu/categories/${categoryId}`, {
+    const response = await this.auth.apiFetch(`${API}/menu/categories/${categoryId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...this.auth.headers() },
       body: JSON.stringify({ name }),
@@ -751,7 +752,7 @@ export class AdminComponent {
     const [moved] = reordered.splice(from, 1);
     if (moved !== undefined) reordered.splice(to, 0, moved);
 
-    await fetch(`${API}/menu/categories/reorder`, {
+    await this.auth.apiFetch(`${API}/menu/categories/reorder`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this.auth.headers() },
       body: JSON.stringify({ orderedIds: reordered }),
@@ -762,7 +763,7 @@ export class AdminComponent {
   protected async deleteCategory(categoryId: string): Promise<void> {
     this.catError.set(null);
 
-    const response = await fetch(`${API}/menu/categories/${categoryId}`, {
+    const response = await this.auth.apiFetch(`${API}/menu/categories/${categoryId}`, {
       method: 'DELETE',
       headers: this.auth.headers(),
     });
@@ -779,7 +780,7 @@ export class AdminComponent {
     if (productId === null) return;
 
     const categoryId = (event.target as HTMLSelectElement).value;
-    const response = await fetch(`${API}/menu/products/${productId}`, {
+    const response = await this.auth.apiFetch(`${API}/menu/products/${productId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...this.auth.headers() },
       body: JSON.stringify({ categoryId }),
@@ -826,7 +827,7 @@ export class AdminComponent {
       return;
     }
 
-    const response = await fetch(`${API}/menu/products`, {
+    const response = await this.auth.apiFetch(`${API}/menu/products`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this.auth.headers() },
       body: JSON.stringify({
@@ -912,7 +913,7 @@ export class AdminComponent {
     let binary = '';
     for (const byte of bytes) binary += String.fromCharCode(byte);
 
-    const response = await fetch(`${API}/images`, {
+    const response = await this.auth.apiFetch(`${API}/images`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this.auth.headers() },
       body: JSON.stringify({

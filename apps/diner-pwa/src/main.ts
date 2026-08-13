@@ -1,3 +1,4 @@
+import { apiUrl, socketUrl } from '@itadaki/shared/domain';
 import { provideZoneChangeDetection } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
@@ -17,7 +18,7 @@ import { OfflineStore } from './app/offline.store';
 // router redirects '' to bienvenida and drops the query string.
 import './app/table-token.store';
 
-const API_URL = 'http://localhost:3100/api';
+const API_URL = apiUrl();
 // Tenant is app configuration, not server infrastructure: importing it from
 // catalog/infra would drag sharp and node builtins into the browser bundle.
 const TENANT_ID = 'itadaki';
@@ -31,7 +32,7 @@ void bootstrapApplication(AppComponent, {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withComponentInputBinding()),
     { provide: API_BASE_URL, useValue: API_URL },
-    { provide: WS_URL, useValue: 'http://localhost:3100' },
+    { provide: WS_URL, useValue: socketUrl() },
     {
       provide: PRODUCT_READER,
       useFactory: (offline: OfflineStore) => new HttpCatalog(API_URL, offline),

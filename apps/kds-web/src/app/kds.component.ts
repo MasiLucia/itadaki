@@ -1,3 +1,4 @@
+import { apiUrl } from '@itadaki/shared/domain';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -33,7 +34,7 @@ const STATIONS: ReadonlyArray<{ id: string; label: string }> = [
 ];
 
 /** Minutes a ticket may wait before the board flags it. */
-const API_URL = 'http://localhost:3100/api';
+const API_URL = apiUrl();
 
 const SLA_WARNING = 8;
 const SLA_LATE = 15;
@@ -76,6 +77,13 @@ const SLA_LATE = 15;
           <span class="dot" aria-hidden="true"></span>
           {{ store.connected() ? 'En vivo' : 'Reconectando…' }}
         </p>
+        @if (store.pending(); as pending) {
+          <!-- Says the taps are safe, not that something broke: they go out
+               on their own as soon as there is signal again. -->
+          <p class="queued" role="status">
+            {{ pending }} sin enviar · se mandan solos
+          </p>
+        }
         <button type="button" class="signout" (click)="auth.signOut()">Salir</button>
       </div>
     </header>

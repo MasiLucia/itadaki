@@ -116,6 +116,19 @@
   animation: none;
 }
 
+/* Reassurance, not an alarm: the work is saved and leaves on its own. */
+.queued {
+  display: flex;
+  align-items: center;
+  background: oklch(30% 0.02 40);
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.6rem 1.1rem;
+  color: var(--itadaki-status-cooking);
+  font-size: 0.83rem;
+  font-weight: 700;
+  margin: 0;
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

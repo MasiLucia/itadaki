@@ -1,3 +1,4 @@
+import { apiUrl } from '@itadaki/shared/domain';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -9,7 +10,7 @@ import {
 import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
 import { FloorStore, type CallDto, type Pickup } from './floor.store';
 
-const API_URL = 'http://localhost:3100/api';
+const API_URL = apiUrl();
 
 /** What the table asked for, in the words a waiter would use. */
 const CALL_LABELS: Record<string, string> = {
@@ -48,6 +49,10 @@ const CALL_LABELS: Record<string, string> = {
             <span class="dot" aria-hidden="true"></span>
             {{ store.connected() ? 'En vivo' : 'Reconectando…' }}
           </p>
+          @if (store.pending(); as pending) {
+            <!-- The taps are saved; they leave on their own with signal. -->
+            <p class="queued" role="status">{{ pending }} sin enviar</p>
+          }
           <button type="button" class="signout" (click)="auth.signOut()">Salir</button>
         </div>
       </header>
@@ -66,6 +71,11 @@ const CALL_LABELS: Record<string, string> = {
             <div class="card-main">
               <span class="table">Mesa {{ tableNumber(call.tableId) }}</span>
               <span class="reason">{{ label(call.reason) }}</span>
+              @if (call.needsCardReader) {
+                <span class="posnet">Llevá el posnet</span>
+              } @else if (call.paymentMethod === 'CASH') {
+                <span class="paying">Pagan en efectivo</span>
+              }
               @if (call.note !== '') {
                 <span class="note">"{{ call.note }}"</span>
               }

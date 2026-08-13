@@ -87,6 +87,13 @@
             "outputPath": "dist/kds-web",
             "polyfills": [
               "zone.js"
+            ],
+            "assets": [
+              {
+                "glob": "sw.js",
+                "input": "apps/kds-web/src",
+                "output": "/"
+              }
             ]
           },
           "configurations": {
@@ -179,6 +186,13 @@
             "outputPath": "dist/floor-web",
             "polyfills": [
               "zone.js"
+            ],
+            "assets": [
+              {
+                "glob": "sw.js",
+                "input": "apps/floor-web/src",
+                "output": "/"
+              }
             ]
           },
           "configurations": {

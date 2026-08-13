@@ -173,6 +173,37 @@
   color: var(--itadaki-ink-muted);
 }
 
+/* Read across a room, before the waiter leaves the bar. */
+/* Reassurance, not an alarm: the work is saved and leaves on its own. */
+.queued {
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.posnet {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.paying {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
 .note {
   font-size: 0.78rem;
   font-style: italic;

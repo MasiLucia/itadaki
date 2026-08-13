@@ -251,4 +251,38 @@ export class AuthStore {
     const token = this.token();
     return token === null ? {} : { Authorization: `Bearer ${token}` };
   }
+
+  /**
+   * Signs out when the API says the session is gone.
+   *
+   * Staff screens live on tablets that nobody watches: a session that expires
+   * mid-service otherwise leaves the board frozen on its last good data, which
+   * reads exactly like a quiet night. Turning that into the login screen is
+   * what tells the kitchen the tickets stopped arriving.
+   *
+   * Returns whether the response was the end of the session, so a caller can
+   * skip parsing a body that is not there.
+   */
+  expired(response: { status: number }): boolean {
+    if (response.status !== 401) return false;
+    if (this.signedIn()) this.signOut();
+    return true;
+  }
+
+  /**
+   * `fetch` with the session attached and expiry handled in one place.
+   *
+   * A screen with a dozen calls cannot be trusted to remember the 401 check at
+   * every one of them, so it happens here instead. Callers still see the
+   * response and decide what to render; by then an expired session has already
+   * become the login screen.
+   */
+  async apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+    const response = await fetch(url, {
+      ...init,
+      headers: { ...this.headers(), ...(init.headers ?? {}) },
+    });
+    this.expired(response);
+    return response;
+  }
 }
