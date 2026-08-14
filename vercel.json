@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "//": "Vale para los cuatro proyectos de Vercel, que salen de este mismo repositorio. El comando de build y el Output Directory de cada uno van en la UI, porque un solo archivo no puede describir cuatro apps: npx ng build <app>  ->  dist/<app>/browser  (el /browser es obligatorio; sin el, la raiz da 404). El rewrite es porque las cuatro son SPA: abrir /bienvenida?t=... directamente, que es lo que hace un QR, tiene que servir el index.html en vez de buscar un archivo.",
+  "installCommand": "npm ci",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
