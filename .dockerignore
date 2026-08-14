@@ -1,0 +1,15 @@
+# Se instala dentro de la imagen; copiarlo traería binarios de otra plataforma.
+node_modules
+dist
+.angular
+
+# Datos y artefactos que no son parte de la aplicación.
+backups
+.image-store
+coverage
+*.log
+
+.git
+.github
+.DS_Store
+README.md

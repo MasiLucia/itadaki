@@ -5,3 +5,4 @@ export { detectImageType, validateUpload, MAX_UPLOAD_BYTES, type IntakeError, ty
 export { LocalImageStore, SharpImageRenderer } from './lib/local-image-store';
 export { PostgresProductStore, PostgresCategoryStore, PostgresPriceAudit } from './lib/postgres-catalog';
 export { PostgresImageStore } from './lib/postgres-images';
+export { type BlobStorage, DiskBlobStorage, S3BlobStorage } from './lib/blob-storage';

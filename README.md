@@ -103,6 +103,8 @@ En desarrollo funcionan los valores por defecto. Para producción:
 | `RESEND_API_KEY` | Envía los mails de recuperación de contraseña. Obligatoria en producción. |
 | `MAIL_FROM` | Remitente verificado, p. ej. `Itadaki <hola@tudominio.com>`. Obligatoria en producción. |
 | `NODE_ENV=production` | Endurece el arranque: exige los secretos, falla si Postgres no responde y agrega HSTS. |
+| `IMAGE_BASE_URL` | Prefijo de las URLs de las fotos, p. ej. `https://api.tudominio.com/api/images`. Se guarda dentro de cada registro: definila antes de la primera subida. |
+| `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Guarda las fotos en un bucket. Sin ellas van al disco local, que no sirve con más de una instancia. `S3_REGION` es opcional (`auto`). |
 
 Las apps del navegador no llevan la URL de la API compilada: la leen en runtime
 del `<meta name="itadaki-api">` de su `index.html`. El mismo build sirve para
@@ -123,12 +125,32 @@ un cron diario con `rclone`, `scp` o lo que uses — y **probá una restauració
 antes de necesitarla**: un dump que nunca se restauró es una suposición, no
 una copia de seguridad.
 
+## Desplegar
+
+```bash
+docker build -t itadaki-api .
+docker run -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e AUTH_SECRET=<32+ caracteres> \
+  -e DATABASE_URL=<conexión del rol de la app> \
+  -e CORS_ORIGINS=https://pedi.tudominio.com,https://cocina.tudominio.com \
+  -e IMAGE_BASE_URL=https://api.tudominio.com/api/images \
+  -e RESEND_API_KEY=<clave> -e MAIL_FROM='Itadaki <hola@tudominio.com>' \
+  -e S3_ENDPOINT=<...> -e S3_BUCKET=<...> \
+  -e S3_ACCESS_KEY_ID=<...> -e S3_SECRET_ACCESS_KEY=<...> \
+  itadaki-api
+```
+
+Con `NODE_ENV=production` la API se niega a arrancar sin `AUTH_SECRET`, sin
+proveedor de correo o con Postgres caído, y avisa si las fotos quedan en disco
+local. Las migraciones se aplican con `npm run db:seed` apuntando a
+`DATABASE_ADMIN_URL`.
+
+Las cuatro apps del navegador son estáticas: `npx ng build <app>` y servir
+`dist/<app>/browser` desde donde quieras, completando el
+`<meta name="itadaki-api">` de cada `index.html` con la URL de la API.
+
 ## Pendiente antes de producción
 
-- Las imágenes se guardan en disco local (`.image-store/`): se pierden al
-  redesplegar y no sirven con más de una instancia. Es lo único que impide
-  correr más de una instancia de la API.
-- No hay Dockerfile: el CI verifica el build y el arranque, pero el empaquetado
-  para el servidor todavía no está.
 - No hay integración de cobro ni facturación ARCA. Decisión tomada: el
   restaurante cobra con su propio sistema.

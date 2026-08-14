@@ -70,3 +70,45 @@ jobs:
           done
           echo "api never answered"
           exit 1
+
+  # The image has to build, and the API inside it has to answer. A Dockerfile
+  # that only builds is half the check: sharp's native binaries fail at the
+  # first photo, not at compile time.
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t itadaki-api:ci .
+
+      - name: Boot it
+        run: |
+          # The image pins NODE_ENV=production, so every guard applies: it
+          # refuses to boot without a signing key, a mail provider or a CORS
+          # allowlist. That is the behaviour under test — these values are
+          # throwaway, and a real deploy supplies real ones.
+          docker run -d --name itadaki-ci \
+            -e USE_POSTGRES=false \
+            -e AUTH_SECRET=solo-para-ci-no-es-un-secreto-real-000 \
+            -e RESEND_API_KEY=clave-de-ci \
+            -e MAIL_FROM='Itadaki <ci@ejemplo.test>' \
+            -e CORS_ORIGINS=http://localhost:4200 \
+            -p 3000:3000 itadaki-api:ci
+
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/api/health > /dev/null; then
+              echo "la api respondió"
+              # sharp's native binaries fail at the first photo, not at build
+              # time, so the image is only proven once this runs inside it.
+              docker exec itadaki-ci node -e "require('sharp')({create:{width:8,height:8,channels:3,background:'#000'}}).webp().toBuffer().then(()=>process.exit(0)).catch(()=>process.exit(1))"
+              docker rm -f itadaki-ci
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "la api nunca respondió"
+          docker logs itadaki-ci
+          exit 1

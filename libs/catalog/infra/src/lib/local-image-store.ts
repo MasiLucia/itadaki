@@ -9,6 +9,7 @@ import { type ImageEditParams, type ImageSet } from '@itadaki/catalog/domain';
 import { type Result, err, ok } from '@itadaki/shared/domain';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { type BlobStorage, DiskBlobStorage } from './blob-storage';
 import sharp from 'sharp';
 import { renderImageSet, toImageSet } from './image-renderer';
 
@@ -114,10 +115,15 @@ export class LocalImageStore implements ImageReader, ImageWriter {
 }
 
 export class SharpImageRenderer implements ImageRenderer {
+  private readonly blobs: BlobStorage;
+
   constructor(
-    private readonly rootDir: string,
+    storage: BlobStorage | string,
     private readonly publicBase: string,
-  ) {}
+  ) {
+    // A plain path still works, so existing callers keep their behaviour.
+    this.blobs = typeof storage === 'string' ? new DiskBlobStorage(storage) : storage;
+  }
 
   async render(
     original: Buffer,
@@ -131,12 +137,14 @@ export class SharpImageRenderer implements ImageRenderer {
       const clean = await sharp(original).rotate().toBuffer();
 
       const rendered = await renderImageSet(clean, params);
-      const dir = join(this.rootDir, tenantId, imageId);
-      await mkdir(dir, { recursive: true });
 
+      // Same key shape the store reads back from, so disk and bucket agree.
       await Promise.all(
         rendered.variants.map((variant) =>
-          writeFile(join(dir, `${variant.width}.${variant.format}`), variant.data),
+          this.blobs.put(
+            `${tenantId}/${imageId}/${variant.width}.${variant.format}`,
+            variant.data,
+          ),
         ),
       );
 

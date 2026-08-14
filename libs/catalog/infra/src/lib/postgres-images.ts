@@ -2,8 +2,7 @@ import { type RepositoryError } from '@itadaki/catalog/application';
 import { type ImageReader, type ImageWriter, type StoredImage } from '@itadaki/catalog/application/server';
 import { type Result, err, ok } from '@itadaki/shared/domain';
 import { type Database } from '@itadaki/shared/persistence';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { type BlobStorage, DiskBlobStorage } from './blob-storage';
 
 interface ImageRow {
   id: string;
@@ -15,18 +14,25 @@ interface ImageRow {
 }
 
 /**
- * Image records live in Postgres; the bytes stay on disk (or S3).
- * Keeping the original file plus its parameters is what makes re-editing
- * non-destructive.
+ * Image records live in Postgres; the bytes go wherever storage says.
+ *
+ * Keeping the original plus its parameters is what makes re-editing
+ * non-destructive. Where those bytes sit — local disk or a bucket — is the
+ * caller's decision, so running two API instances does not need a code change.
  */
 export class PostgresImageStore implements ImageReader, ImageWriter {
+  private readonly blobs: BlobStorage;
+
   constructor(
     private readonly db: Database,
-    private readonly rootDir: string,
-  ) {}
+    storage: BlobStorage | string,
+  ) {
+    // A plain path still works, so existing callers keep their behaviour.
+    this.blobs = typeof storage === 'string' ? new DiskBlobStorage(storage) : storage;
+  }
 
-  private dirFor(tenantId: string, imageId: string): string {
-    return join(this.rootDir, tenantId, imageId);
+  private keyFor(tenantId: string, imageId: string, file: string): string {
+    return `${tenantId}/${imageId}/${file}`;
   }
 
   async saveOriginal(
@@ -35,11 +41,9 @@ export class PostgresImageStore implements ImageReader, ImageWriter {
     data: Buffer,
   ): Promise<Result<string, RepositoryError>> {
     try {
-      const dir = this.dirFor(tenantId, imageId);
-      await mkdir(dir, { recursive: true });
-      const path = join(dir, 'original');
-      await writeFile(path, data);
-      return ok(path);
+      const key = this.keyFor(tenantId, imageId, 'original');
+      await this.blobs.put(key, data);
+      return ok(key);
     } catch (error) {
       return err({ kind: 'CONFLICT', detail: String(error) });
     }
@@ -47,7 +51,7 @@ export class PostgresImageStore implements ImageReader, ImageWriter {
 
   async readOriginal(tenantId: string, imageId: string): Promise<Result<Buffer, RepositoryError>> {
     try {
-      return ok(await readFile(join(this.dirFor(tenantId, imageId), 'original')));
+      return ok(await this.blobs.get(this.keyFor(tenantId, imageId, 'original')));
     } catch {
       return err({ kind: 'NOT_FOUND', id: imageId });
     }
@@ -59,7 +63,7 @@ export class PostgresImageStore implements ImageReader, ImageWriter {
     file: string,
   ): Promise<Result<Buffer, RepositoryError>> {
     try {
-      return ok(await readFile(join(this.dirFor(tenantId, imageId), file)));
+      return ok(await this.blobs.get(this.keyFor(tenantId, imageId, file)));
     } catch {
       return err({ kind: 'NOT_FOUND', id: file });
     }
