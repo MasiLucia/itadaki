@@ -35,7 +35,9 @@ export class PostgresTableStore {
     try {
       const rows = await this.db.unscoped(async (client) => {
         const result = await client.query<TableRow>(
-          'SELECT * FROM table_secret_lookup WHERE tenant_id = $1 AND id = $2',
+          // Una función y no una tabla: verificar un QR pasa antes de confiar
+          // en el restaurante que el token declara — ver la migración 009.
+          'SELECT * FROM table_secret_lookup_fn($1, $2)',
           [tenantId, tableId],
         );
         return result.rows;

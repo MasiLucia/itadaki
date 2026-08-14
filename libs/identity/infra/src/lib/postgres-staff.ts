@@ -33,7 +33,11 @@ export class PostgresStaffStore {
     try {
       const rows = await this.db.unscoped(async (client) => {
         const result = await client.query<StaffRow>(
-          'SELECT * FROM staff_login_lookup WHERE lower(email) = lower($1) AND active',
+          // A function rather than a table: login happens before a tenant is
+          // known, so this one lookup has to see past row level security. It
+          // runs SECURITY DEFINER and answers with at most the single row
+          // matching that address — see migration 009.
+          'SELECT * FROM staff_login_lookup_fn($1)',
           [email],
         );
         return result.rows;

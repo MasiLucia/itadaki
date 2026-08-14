@@ -37,6 +37,12 @@ async function main(): Promise<void> {
   );
   await client.query(migration);
 
+  // Row level security applies to whoever is not a superuser, which on a
+  // hosted database is everyone. Without this the INSERT below matches no
+  // policy, writes nothing, and still reports success — the account looks
+  // created and then cannot log in.
+  await client.query('SELECT set_config($1, $2, false)', ['app.tenant_id', tenantId]);
+
   await client.query(
     `INSERT INTO tenants (id, name, slug) VALUES ($1,$1,$1) ON CONFLICT (id) DO NOTHING`,
     [tenantId],
@@ -57,6 +63,21 @@ async function main(): Promise<void> {
       role,
     ],
   );
+
+  // A silent no-op is the failure mode this script had; confirm the row is
+  // really there rather than trusting that the INSERT ran.
+  const check = await client.query<{ total: string }>(
+    'SELECT count(*)::text AS total FROM staff_users WHERE email = $1',
+    [checked.value.email],
+  );
+  if (check.rows[0]?.total === '0') {
+    console.error(
+      'la cuenta no se guardó: la política de aislamiento descartó la fila. ' +
+        'Revisá que DATABASE_ADMIN_URL apunte a la base correcta.',
+    );
+    await client.end();
+    process.exit(1);
+  }
 
   console.log(`cuenta creada: ${checked.value.email} (${role}) en ${tenantId}`);
   await client.end();

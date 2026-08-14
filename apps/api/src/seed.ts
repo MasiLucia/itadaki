@@ -28,6 +28,11 @@ async function main(): Promise<void> {
   }
   console.log('schema applied');
 
+  // Set before any write: row level security applies to everyone who is not a
+  // superuser, which on a hosted database is the only user there is. Scoping
+  // afterwards let this pass locally and fail on Render.
+  await client.query('SELECT set_config($1, $2, false)', ['app.tenant_id', TENANT_ID]);
+
   // The demo tenant, before anything references it.
   //
   // Migration 002 backfills tenants from existing products, which covers a
@@ -39,8 +44,6 @@ async function main(): Promise<void> {
      ON CONFLICT (id) DO NOTHING`,
     [TENANT_ID, 'Restaurante demo'],
   );
-
-  await client.query('SELECT set_config($1, $2, false)', ['app.tenant_id', TENANT_ID]);
 
   // The fixture is the whole demo catalog, not an addition to it: upserting
   // alone would leave dishes from an earlier fixture sitting in the menu.

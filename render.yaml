@@ -1,0 +1,54 @@
+# Despliegue de la API en Render.
+#
+# Sólo la API y la base: las cuatro apps del navegador son archivos estáticos
+# y viven en Vercel.
+#
+# El plan gratis duerme el servicio a los 15 minutos sin tráfico y tarda cerca
+# de un minuto en despertar. Alcanza para probar y para mostrar demos; para un
+# restaurante cobrando hay que pasar a un plan pago, porque el primer comensal
+# de la noche no va a esperar ese minuto mirando una pantalla en blanco.
+
+services:
+  - type: web
+    name: itadaki-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+
+    envVars:
+      # Firma las sesiones del personal. Render la genera una vez y la guarda;
+      # si se filtra, cualquiera puede fabricarse un token de dueño.
+      - key: AUTH_SECRET
+        generateValue: true
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: itadaki-db
+          property: connectionString
+
+      # Los cuatro dominios de Vercel, separados por coma. Sin esto el
+      # navegador bloquea las llamadas: la app carga y no puede hacer nada.
+      - key: CORS_ORIGINS
+        sync: false
+
+      # Prefijo que queda guardado dentro de cada foto que se sube, así que
+      # conviene definirlo antes de la primera carga.
+      - key: IMAGE_BASE_URL
+        sync: false
+
+      # Sin proveedor de correo la API se niega a arrancar en producción: un
+      # flujo de recuperación que no manda nada es peor que uno que falta.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+
+databases:
+  - name: itadaki-db
+    plan: free
+    region: oregon
+    # El plan gratis de Render borra la base a los 90 días. Antes de eso hay
+    # que pasar a un plan pago o migrarla — scripts/backup.sh saca el dump.
+    postgresMajorVersion: "16"

@@ -128,16 +128,34 @@ CREATE TABLE IF NOT EXISTS images (
 -- The role the API connects as, which every GRANT below targets.
 --
 -- Created here when absent so migrating a fresh database never depends on
--- someone having run a setup step by hand. Docker Compose creates it too;
+-- someone having run a setup step by hand; Docker Compose creates it too, and
 -- both paths are idempotent.
+--
+-- On a hosted database (Render, Neon, Supabase) neither applies: the provider
+-- hands over one user that cannot CREATE ROLE, and the app connects as that
+-- user. Failing here would abort the whole migration over something that does
+-- not matter there, so the block gives up quietly and the GRANTs below are
+-- skipped the same way — a role that does not exist needs no permissions.
+--
+-- The password is only ever used by docker compose on a laptop. A hosted
+-- deploy never reaches this branch, so it is not a credential in production.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'itadaki_app') THEN
-    CREATE ROLE itadaki_app LOGIN PASSWORD 'itadaki_app';
+    BEGIN
+      CREATE ROLE itadaki_app LOGIN PASSWORD 'itadaki_app';
+    EXCEPTION WHEN insufficient_privilege THEN
+      RAISE NOTICE 'sin permiso para crear itadaki_app: la app usa el usuario del proveedor';
+    END;
   END IF;
 END $$;
 
-GRANT USAGE ON SCHEMA public TO itadaki_app;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'itadaki_app') THEN
+    GRANT USAGE ON SCHEMA public TO itadaki_app;
+  END IF;
+END $$;
 
 -- Row level security. Every policy compares against app.tenant_id, which the
 -- connection sets per request; a query that forgets the tenant returns nothing
@@ -162,12 +180,20 @@ BEGIN
     -- The role the API connects as. Granted here rather than by hand, so a
     -- database created from scratch works without anyone remembering this:
     -- row level security above is what keeps the access tenant-scoped.
-    EXECUTE format(
-      'GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO itadaki_app',
-      target
-    );
+    -- Skipped where the role does not exist, which is every hosted database.
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'itadaki_app') THEN
+      EXECUTE format(
+        'GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO itadaki_app',
+        target
+      );
+    END IF;
   END LOOP;
 END $$;
 
 -- price_audit uses a bigserial, and INSERT on it needs the sequence too.
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO itadaki_app;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'itadaki_app') THEN
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO itadaki_app;
+  END IF;
+END $$;
