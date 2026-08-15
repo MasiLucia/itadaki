@@ -301,11 +301,24 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* El botón al lado del nombre, no debajo: apilarlos duplicaba el alto de
+   cada plato, y con veinte mesas activas eso era la diferencia entre ver
+   cinco mesas y ver dos. La nota, cuando hay, sí baja a su propia línea. */
 .item-body {
   display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.6rem;
+  row-gap: 0.1rem;
   min-width: 0;
+}
+
+.item-body .item-name {
+  flex: 1 1 auto;
+}
+
+.item-body .item-note {
+  flex: 1 0 100%;
 }
 
 .item-name {
@@ -458,4 +471,66 @@
 .ticket-item[data-item-status='DELIVERED'] .item-name {
   color: var(--itadaki-ink-subtle);
   text-decoration: line-through;
+}
+
+/* Una mesa que espera atrás: una línea, no una tarjeta.
+   Sigue diciendo lo único que el cocinero necesita para decidir si la abre —
+   qué mesa, cuántos platos, hace cuánto — en 44px en vez de 900. */
+.folded {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid oklch(38% 0.02 40);
+  border-left: 4px solid oklch(45% 0.02 40);
+  border-radius: var(--itadaki-radius-card);
+  background: oklch(26% 0.015 40);
+  color: oklch(88% 0.02 70);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.folded:hover {
+  background: oklch(30% 0.02 40);
+}
+
+.folded-table {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.folded-count {
+  font-size: 0.85rem;
+  color: oklch(72% 0.02 70);
+}
+
+.folded-time {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* La demora se ve sin abrir la mesa. */
+.folded[data-sla='warning'] {
+  border-left-color: var(--itadaki-status-cooking);
+}
+
+.folded[data-sla='late'] {
+  border-left-color: var(--itadaki-status-late);
+  background: oklch(28% 0.04 30);
+}
+
+.fold-btn {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid oklch(45% 0.02 40);
+  border-radius: var(--itadaki-radius-pill);
+  background: transparent;
+  color: oklch(80% 0.02 70);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
 }

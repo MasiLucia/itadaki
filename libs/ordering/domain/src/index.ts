@@ -65,4 +65,10 @@ export {
   orderStatusFrom,
   countAtLeast,
 } from './lib/item-status';
-export { type BoardTicket, type TableCard, groupByTable } from './lib/table-board';
+export {
+  type BoardTicket,
+  type TableCard,
+  OPEN_CARDS,
+  groupByTable,
+  splitByUrgency,
+} from './lib/table-board';

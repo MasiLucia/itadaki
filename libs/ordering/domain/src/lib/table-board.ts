@@ -93,3 +93,43 @@ function earliest(a: string | null, b: string | null): string | null {
   if (b === null) return a;
   return a < b ? a : b;
 }
+
+/**
+ * Cuántas mesas se muestran abiertas antes de plegar el resto.
+ *
+ * Una cocina trabaja por orden de llegada: el cocinero saca lo más viejo y
+ * recién después mira lo que sigue. Con veinte mesas activas, mostrarlas
+ * todas desplegadas daba ocho pantallas de scroll y perdía de vista la
+ * primera — que es justamente la que hay que sacar.
+ *
+ * Cinco es lo que entra en una tablet horizontal sin scrollear.
+ */
+export const OPEN_CARDS = 5;
+
+/**
+ * Parte el tablero en lo que se atiende ahora y lo que espera.
+ *
+ * Lo urgente va abierto, con sus platos y sus botones. El resto queda como
+ * una línea por mesa: sigue estando a la vista — el cocinero ve cuántas
+ * mesas tiene atrás y hace cuánto esperan — pero sin ocupar la pantalla.
+ *
+ * Una mesa que pasó el umbral de demora nunca se pliega, aunque haya muchas
+ * antes: es la que se está enfriando.
+ */
+export function splitByUrgency(
+  cards: readonly TableCard[],
+  minutesWaiting: (card: TableCard) => number,
+  lateAfterMinutes: number,
+  openCount: number = OPEN_CARDS,
+): { readonly open: readonly TableCard[]; readonly folded: readonly TableCard[] } {
+  const open: TableCard[] = [];
+  const folded: TableCard[] = [];
+
+  for (const [index, card] of cards.entries()) {
+    const late = minutesWaiting(card) >= lateAfterMinutes;
+    if (index < openCount || late) open.push(card);
+    else folded.push(card);
+  }
+
+  return { open, folded };
+}

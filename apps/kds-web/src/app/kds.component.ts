@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
-import { type TableCard, groupByTable } from '@itadaki/ordering/domain';
+import { type TableCard, groupByTable, splitByUrgency } from '@itadaki/ordering/domain';
 import { KdsStore, type TicketDto } from './kds.store';
 
 interface Column {
@@ -94,11 +94,11 @@ const SLA_LATE = 15;
         <section class="col" [attr.data-status]="column.status">
           <header class="col-head">
             <h2 class="col-name">{{ column.label }}</h2>
-            <span class="col-count">{{ ticketsFor(column.status).length }}</span>
+            <span class="col-count">{{ countFor(column.status) }}</span>
           </header>
 
           <div class="tickets">
-            @for (ticket of ticketsFor(column.status); track ticket.key) {
+            @for (ticket of openFor(column.status); track ticket.key) {
               <article class="ticket" [attr.data-sla]="slaOf(ticket)">
                 <header class="ticket-head">
                   <span class="ticket-table">
@@ -152,6 +152,69 @@ const SLA_LATE = 15;
               </article>
             } @empty {
               <p class="empty">sin pedidos</p>
+            }
+
+            <!-- Las que esperan atrás. Siguen a la vista — el cocinero ve
+                 cuántas mesas tiene y hace cuánto esperan — pero como una
+                 línea cada una, y se abren al tocarlas. -->
+            @for (ticket of foldedFor(column.status); track ticket.key) {
+              @if (expanded().has(ticket.key)) {
+                <article class="ticket" [attr.data-sla]="slaOf(ticket)">
+                  <header class="ticket-head">
+                    <span class="ticket-table">
+                      <span class="table-word">mesa</span>
+                      <span class="table-number">{{ tableNumber(ticket) }}</span>
+                    </span>
+                    <button type="button" class="fold-btn" (click)="toggle(ticket.key)">
+                      plegar
+                    </button>
+                  </header>
+
+                  <ul class="ticket-items">
+                    @for (item of visibleItems(ticket); track item.orderId + item.id) {
+                      <li class="ticket-item" [attr.data-item-status]="item.status">
+                        <span class="qty">{{ item.quantity }}</span>
+                        <span class="item-body">
+                          <span class="item-name">{{ item.name }}</span>
+                          @if (item.notes !== '') {
+                            <span class="item-note">{{ item.notes }}</span>
+                          }
+                          @if (nextFor(item.status); as step) {
+                            <button
+                              type="button"
+                              class="item-btn"
+                              (click)="advanceItem(item.orderId, item.id, step.next)"
+                            >
+                              {{ step.action }}
+                            </button>
+                          }
+                        </span>
+                      </li>
+                    }
+                  </ul>
+
+                  @if (column.next !== null) {
+                    <button
+                      type="button"
+                      class="ticket-btn"
+                      (click)="advanceCard(ticket, column.next)"
+                    >
+                      {{ column.action }} · todo →
+                    </button>
+                  }
+                </article>
+              } @else {
+                <button
+                  type="button"
+                  class="folded"
+                  [attr.data-sla]="slaOf(ticket)"
+                  (click)="toggle(ticket.key)"
+                >
+                  <span class="folded-table">mesa {{ tableNumber(ticket) }}</span>
+                  <span class="folded-count">{{ ticket.items.length }} platos</span>
+                  <span class="folded-time">{{ waited(ticket) }}</span>
+                </button>
+              }
             }
           </div>
         </section>
@@ -225,8 +288,41 @@ export class KdsComponent implements OnDestroy {
     this.activeStation.set(id);
   }
 
-  protected ticketsFor(status: string): readonly TableCard[] {
-    return this.byStatus().get(status) ?? [];
+  /**
+   * Lo que se atiende ahora, abierto con sus platos y sus botones.
+   *
+   * Con veinte mesas activas el tablero medía ocho pantallas de alto, y el
+   * cocinero perdía de vista la primera — que es la que hay que sacar.
+   */
+  protected openFor(status: string): readonly TableCard[] {
+    return this.split(status).open;
+  }
+
+  /** Las que esperan atrás: una línea cada una, para no ocupar la pantalla. */
+  protected foldedFor(status: string): readonly TableCard[] {
+    return this.split(status).folded;
+  }
+
+  private split(status: string): { open: readonly TableCard[]; folded: readonly TableCard[] } {
+    const cards = this.byStatus().get(status) ?? [];
+    return splitByUrgency(cards, (card) => this.minutesWaiting(card), SLA_LATE);
+  }
+
+  /** Todas las mesas de esa columna: el contador del encabezado las cuenta
+   *  a todas, estén abiertas o plegadas. */
+  protected countFor(status: string): number {
+    return (this.byStatus().get(status) ?? []).length;
+  }
+
+  /** Las mesas plegadas que el cocinero abrió a mano. */
+  protected readonly expanded = signal(new Set<string>());
+
+  protected toggle(key: string): void {
+    this.expanded.update((abiertas) => {
+      const siguiente = new Set(abiertas);
+      if (!siguiente.delete(key)) siguiente.add(key);
+      return siguiente;
+    });
   }
 
   /**
