@@ -260,6 +260,17 @@
 
 .ticket[data-sla='late'] .ticket-time { color: var(--itadaki-accent); }
 
+/* La mesa agregó después del primer envío: el cocinero tiene que notar que
+   esos platos no entraron todos juntos. */
+.ticket-added {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--itadaki-status-cooking);
+}
+
 .ticket-items {
   list-style: none;
   margin: 0;

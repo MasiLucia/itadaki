@@ -36,42 +36,47 @@ const STEP_LABELS: Record<string, { title: string; hint: string }> = {
 
     @if (store.hasOrders()) {
       <main class="body">
-        <!-- One card per dish, not per order. The kitchen finishes dishes at
-             different times, and a shared card made a served plate look done
-             while another was still cooking. -->
-        @for (dish of dishes(); track dish.key) {
-          <section class="card">
-            <div class="card-head">
-              <h2 class="card-title">
-                {{ dish.quantity }}× {{ dish.name }}
-                @if (dish.placedAt; as time) {
-                  <span class="placed">· {{ time }}</span>
-                }
-              </h2>
-            </div>
-
-            <ol class="timeline">
-              @for (step of steps; track step; let index = $index) {
-                <li
-                  class="rung"
-                  [class.done]="index < dish.step"
-                  [class.active]="index === dish.step"
-                  [attr.aria-current]="index === dish.step ? 'step' : null"
-                >
-                  <span class="dot" aria-hidden="true"></span>
-                  <span class="rung-text">
-                    <span class="rung-title">{{ label(step).title }}</span>
-                    <span class="rung-hint">{{ label(step).hint }}</span>
-                  </span>
-                </li>
-              }
-            </ol>
-
-            @if (dish.status === 'DELIVERED') {
-              <p class="delivered" role="status">servido · buen provecho</p>
+        <!-- Un estado para todo el pedido, y el detalle por plato debajo.
+             Una línea de tiempo completa por plato convertía una mesa de
+             cinco platos en una pantalla larguísima donde no se entendía
+             cómo venía el pedido en conjunto. -->
+        <section class="card">
+          <ol class="timeline">
+            @for (step of steps; track step; let index = $index) {
+              <li
+                class="rung"
+                [class.done]="index < overallStep()"
+                [class.active]="index === overallStep()"
+                [attr.aria-current]="index === overallStep() ? 'step' : null"
+              >
+                <span class="dot" aria-hidden="true"></span>
+                <span class="rung-text">
+                  <span class="rung-title">{{ label(step).title }}</span>
+                  <span class="rung-hint">{{ label(step).hint }}</span>
+                </span>
+              </li>
             }
-          </section>
-        }
+          </ol>
+
+          @if (readyCount() > 0 && readyCount() < dishes().length) {
+            <p class="partial" role="status">
+              {{ readyCount() }} de {{ dishes().length }} ya salieron
+            </p>
+          }
+        </section>
+
+        <section class="card">
+          <h2 class="dishes-title">tu pedido</h2>
+          <ul class="dishes">
+            @for (dish of dishes(); track dish.key) {
+              <li class="dish" [attr.data-status]="dish.status">
+                <span class="dish-qty">{{ dish.quantity }}</span>
+                <span class="dish-name">{{ dish.name }}</span>
+                <span class="dish-state">{{ dishState(dish.status) }}</span>
+              </li>
+            }
+          </ul>
+        </section>
 
         @for (order of store.cancelled(); track order.id) {
           <section class="card cancelled">
@@ -147,6 +152,31 @@ export class TrackingPage {
       })),
     ),
   );
+
+  /**
+   * En qué paso está el pedido en conjunto: el del plato más atrasado.
+   *
+   * Es lo que la mesa quiere saber de un vistazo — "¿ya viene?" — sin tener
+   * que leer el estado de cada plato uno por uno.
+   */
+  protected readonly overallStep = computed(() => {
+    const pasos = this.dishes().map((dish) => dish.step);
+    return pasos.length === 0 ? 0 : Math.min(...pasos);
+  });
+
+  /** Cuántos platos ya salieron de la cocina, para el "2 de 5". */
+  protected readonly readyCount = computed(
+    () => this.dishes().filter((dish) => dish.status === 'READY' || dish.status === 'DELIVERED').length,
+  );
+
+  /** El estado de un plato en dos palabras, al lado de su nombre. */
+  protected dishState(status: string): string {
+    if (status === 'DELIVERED') return 'servido';
+    if (status === 'READY') return 'ya sale';
+    if (status === 'IN_PREP') return 'preparando';
+    if (status === 'ACCEPTED') return 'en cola';
+    return 'enviado';
+  }
 
   protected label(step: string): { title: string; hint: string } {
     return STEP_LABELS[step] ?? { title: step, hint: '' };

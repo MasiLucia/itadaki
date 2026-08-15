@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
+import { type TableCard, groupByTable } from '@itadaki/ordering/domain';
 import { KdsStore, type TicketDto } from './kds.store';
 
 interface Column {
@@ -97,7 +98,7 @@ const SLA_LATE = 15;
           </header>
 
           <div class="tickets">
-            @for (ticket of ticketsFor(column.status); track ticket.id) {
+            @for (ticket of ticketsFor(column.status); track ticket.key) {
               <article class="ticket" [attr.data-sla]="slaOf(ticket)">
                 <header class="ticket-head">
                   <span class="ticket-table">
@@ -107,8 +108,14 @@ const SLA_LATE = 15;
                   <span class="ticket-time">{{ waited(ticket) }}</span>
                 </header>
 
+                @if (ticket.ticketCount > 1) {
+                  <!-- La mesa agregó algo después del primer envío. Sin esto,
+                       los platos nuevos aparecerían mezclados sin aviso. -->
+                  <p class="ticket-added">agregó · {{ ticket.ticketCount }} envíos</p>
+                }
+
                 <ul class="ticket-items">
-                  @for (item of visibleItems(ticket); track item.name + item.notes) {
+                  @for (item of visibleItems(ticket); track item.orderId + item.id) {
                     <li class="ticket-item" [attr.data-item-status]="item.status">
                       <span class="qty">{{ item.quantity }}</span>
                       <span class="item-body">
@@ -122,7 +129,7 @@ const SLA_LATE = 15;
                           <button
                             type="button"
                             class="item-btn"
-                            (click)="advanceItem(ticket.id, item.id, step.next)"
+                            (click)="advanceItem(item.orderId, item.id, step.next)"
                           >
                             {{ step.action }}
                           </button>
@@ -138,7 +145,7 @@ const SLA_LATE = 15;
                 </ul>
 
                 @if (column.next !== null) {
-                  <button type="button" class="ticket-btn" (click)="advance(ticket.id, column.next)">
+                  <button type="button" class="ticket-btn" (click)="advanceCard(ticket, column.next)">
                     {{ column.action }} · todo →
                   </button>
                 }
@@ -176,12 +183,20 @@ export class KdsComponent implements OnDestroy {
       .filter((ticket) => ticket.items.some((item) => item.station === station));
   });
 
+  /**
+   * Una tarjeta por mesa, no por envío.
+   *
+   * Una mesa que agrega el postre aparecía dos veces en la pantalla, a veces
+   * en columnas distintas, y el cocinero tenía que reconstruirla a ojo.
+   */
+  private readonly cards = computed(() => groupByTable(this.visible()));
+
   private readonly byStatus = computed(() => {
-    const grouped = new Map<string, TicketDto[]>();
-    for (const ticket of this.visible()) {
-      const bucket = grouped.get(ticket.status) ?? [];
-      bucket.push(ticket);
-      grouped.set(ticket.status, bucket);
+    const grouped = new Map<string, TableCard[]>();
+    for (const card of this.cards()) {
+      const bucket = grouped.get(card.status) ?? [];
+      bucket.push(card);
+      grouped.set(card.status, bucket);
     }
     return grouped;
   });
@@ -210,15 +225,29 @@ export class KdsComponent implements OnDestroy {
     this.activeStation.set(id);
   }
 
-  protected ticketsFor(status: string): readonly TicketDto[] {
+  protected ticketsFor(status: string): readonly TableCard[] {
     return this.byStatus().get(status) ?? [];
   }
 
+  /**
+   * Avanza todos los platos de la mesa que todavía no llegaron a ese estado.
+   *
+   * Recorre plato por plato porque una tarjeta puede juntar varios envíos, y
+   * cada uno es una comanda distinta del lado del servidor.
+   */
+  protected async advanceCard(card: TableCard, next: string): Promise<void> {
+    for (const item of card.items) {
+      if (item.status !== next) {
+        await this.store.advanceItem(item.orderId, item.id, next);
+      }
+    }
+  }
+
   /** On a station screen, hide the lines that belong to another station. */
-  protected visibleItems(ticket: TicketDto): TicketDto['items'] {
+  protected visibleItems(card: TableCard): TableCard['items'] {
     const station = this.activeStation();
-    if (station === 'ALL') return ticket.items;
-    return ticket.items.filter((item) => item.station === station);
+    if (station === 'ALL') return card.items;
+    return card.items.filter((item) => item.station === station);
   }
 
   protected stationLabel(station: string): string {
@@ -242,28 +271,29 @@ export class KdsComponent implements OnDestroy {
     await this.store.advanceItem(orderId, itemId, next);
   }
 
-  protected tableNumber(ticket: TicketDto): string {
-    const source = ticket.tableId ?? ticket.sessionId;
+  protected tableNumber(card: TableCard): string {
+    // `key` ya trae la sesión cuando la comanda no dice de qué mesa es.
+    const source = card.tableId ?? card.key;
     const digits = /(\d+)\s*$/.exec(source);
     if (digits !== null) return digits[1] ?? source;
     return source.length > 12 ? source.slice(0, 4) : source;
   }
 
-  private minutesWaiting(ticket: TicketDto): number {
-    if (ticket.placedAt === null) return 0;
-    return (this.tick() - new Date(ticket.placedAt).getTime()) / 60_000;
+  private minutesWaiting(card: TableCard): number {
+    if (card.placedAt === null) return 0;
+    return (this.tick() - new Date(card.placedAt).getTime()) / 60_000;
   }
 
-  protected slaOf(ticket: TicketDto): 'ok' | 'warning' | 'late' {
-    const minutes = this.minutesWaiting(ticket);
+  protected slaOf(card: TableCard): 'ok' | 'warning' | 'late' {
+    const minutes = this.minutesWaiting(card);
     if (minutes >= SLA_LATE) return 'late';
     if (minutes >= SLA_WARNING) return 'warning';
     return 'ok';
   }
 
-  protected waited(ticket: TicketDto): string {
-    if (ticket.placedAt === null) return 'ahora';
-    const minutes = Math.floor(this.minutesWaiting(ticket));
+  protected waited(card: TableCard): string {
+    if (card.placedAt === null) return 'ahora';
+    const minutes = Math.floor(this.minutesWaiting(card));
     if (minutes < 1) return 'recién';
     return `${minutes} min`;
   }
