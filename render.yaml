@@ -38,6 +38,12 @@ services:
       - key: IMAGE_BASE_URL
         sync: false
 
+      # A dónde apunta el QR impreso. Sin esto los códigos salen apuntando a
+      # localhost y no funcionan en ningún teléfono que no sea el de quien los
+      # generó — el error se ve recién al escanear uno.
+      - key: DINER_APP_URL
+        sync: false
+
       # Sin proveedor de correo la API se niega a arrancar en producción: un
       # flujo de recuperación que no manda nada es peor que uno que falta.
       - key: RESEND_API_KEY
