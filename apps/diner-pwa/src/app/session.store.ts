@@ -70,6 +70,17 @@ export class SessionStore {
     this.restore();
   }
 
+  /** Quién fue esta persona en esta mesa, si ya estuvo. */
+  private storedDinerId(): string | null {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw === null) return null;
+      return (JSON.parse(raw) as { dinerId?: string }).dinerId ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Rejoins the same session after a reload so a refresh does not eject the diner. */
   private restore(): void {
     try {
@@ -118,7 +129,16 @@ export class SessionStore {
       return false;
     }
 
-    const response = await this.api.send('/sessions/join', 'POST', { tableToken, nickname });
+    // Quien ya estuvo en esta mesa vuelve con su mismo id: sin esto, cerrar
+    // la pestaña la mandaba contra "ese nombre ya está en la mesa" — y el
+    // único nombre que quería usar era justamente ese.
+    const anterior = this.storedDinerId();
+
+    const response = await this.api.send('/sessions/join', 'POST', {
+      tableToken,
+      nickname,
+      ...(anterior === null ? {} : { dinerId: anterior }),
+    });
 
     if (!response.ok) {
       const detail = (await response.json().catch(() => null)) as { kind?: string } | null;

@@ -219,3 +219,50 @@ describe('shared cart', () => {
     expect(canModify(first, 'd2')).toBe(false);
   });
 });
+
+describe('alguien que vuelve a su propia mesa', () => {
+  const mesa = () => {
+    const abierta = openSession({
+      id: 's1', tenantId: 't1', tableId: 'mesa-1', currency: 'ARS', at: AT,
+    });
+    const con = joinSession(abierta, { id: 'd1', nickname: 'Cami', at: AT });
+    if (con.isErr()) throw new Error('no pudo entrar');
+    return con.value;
+  };
+
+  it('la reconoce en vez de pedirle otro nombre', () => {
+    // Cerrar la pestaña o quedarse sin batería la mandaba contra "ese nombre
+    // ya está en la mesa", sin forma de volver a su propio pedido.
+    const vuelve = joinSession(mesa(), { id: 'd1', nickname: 'Cami', at: AT });
+
+    expect(vuelve.isOk()).toBe(true);
+    expect(vuelve.isOk() && vuelve.value.diners).toHaveLength(1);
+  });
+
+  it('la deja volver aunque escriba el nombre distinto', () => {
+    // Es la misma persona: lo que la identifica es su id, no cómo lo tipeó.
+    const vuelve = joinSession(mesa(), { id: 'd1', nickname: 'cami', at: AT });
+    expect(vuelve.isOk()).toBe(true);
+  });
+
+  it('no la duplica en la mesa', () => {
+    const vuelve = joinSession(mesa(), { id: 'd1', nickname: 'Cami', at: AT });
+    const ids = vuelve.isOk() ? vuelve.value.diners.map((d) => d.id) : [];
+    expect(ids).toEqual(['d1']);
+  });
+
+  it('sigue rechazando a alguien distinto con el mismo nombre', () => {
+    // Dos "Cami" en la misma mesa harían ilegible el carrito compartido.
+    const otra = joinSession(mesa(), { id: 'd2', nickname: 'Cami', at: AT });
+
+    expect(otra.isErr()).toBe(true);
+    expect(otra.isErr() && otra.error.kind).toBe('NICKNAME_TAKEN');
+  });
+
+  it('no deja entrar a una mesa cerrada por más que ya haya estado', () => {
+    const cerrada = closeSession(mesa());
+    const vuelve = joinSession(cerrada, { id: 'd1', nickname: 'Cami', at: AT });
+
+    expect(vuelve.isErr() && vuelve.error.kind).toBe('SESSION_CLOSED');
+  });
+});

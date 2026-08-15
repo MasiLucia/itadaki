@@ -55,10 +55,15 @@ export function normaliseNickname(raw: string): string {
 }
 
 /**
- * Adds a diner to the table.
+ * Suma a alguien a la mesa, o lo reconoce si ya estaba.
  *
- * Nicknames are unique per session, case-insensitively: two people called
- * "Ana" at the same table would make the shared cart unreadable.
+ * Los apodos son únicos por mesa, sin distinguir mayúsculas: dos "Ana" en la
+ * misma mesa harían ilegible el carrito compartido.
+ *
+ * Pero quien vuelve no es alguien nuevo. Cerrar la pestaña, quedarse sin
+ * batería o volver del baño mandaba a la misma persona contra un
+ * "ese nombre ya está en la mesa", sin forma de entrar a su propio pedido:
+ * el único nombre que quería usar era justamente el que ya estaba ocupado.
  */
 export function joinSession(
   session: TableSession,
@@ -71,6 +76,13 @@ export function joinSession(
   const nickname = normaliseNickname(params.nickname);
   if (!NICKNAME_PATTERN.test(nickname)) {
     return err({ kind: 'INVALID_NICKNAME', nickname: params.nickname });
+  }
+
+  // Ya está sentada: la mesa queda igual y sigue con su mismo id, así que
+  // sus platos y su parte de la cuenta la siguen esperando.
+  const yaEsta = session.diners.some((diner) => diner.id === params.id);
+  if (yaEsta) {
+    return ok(session);
   }
 
   if (session.diners.length >= MAX_DINERS) {

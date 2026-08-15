@@ -29,6 +29,13 @@ const joinSchema = z.object({
   /** Signed by the table's own secret; carries both tenant and table. */
   tableToken: z.string().min(1).max(2000),
   nickname: z.string().min(1).max(20),
+  /**
+   * Quien vuelve a la misma mesa, guardado en su teléfono.
+   *
+   * Sólo se acepta si esa persona sigue sentada acá: inventar un id ajeno no
+   * da acceso a nada, porque se compara contra los que ya están en la mesa.
+   */
+  dinerId: z.string().min(1).max(64).optional(),
 });
 
 const addSchema = z.object({
@@ -153,6 +160,7 @@ export class SessionsController {
       tableId: table.tableId,
       nickname: parsed.data.nickname,
       currency: 'ARS',
+      ...(parsed.data.dinerId === undefined ? {} : { dinerId: parsed.data.dinerId }),
     });
 
     if (result.isErr()) {

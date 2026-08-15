@@ -185,7 +185,9 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
     @if (sharedCount() > 0) {
       <footer class="foot">
         <a class="cta" routerLink="/carrito">
-          <span>Ver pedido de la mesa · {{ sharedCount() }}</span>
+          <!-- Sin el número suelto: "Ver pedido de la mesa · 3" se leía como
+               si el 3 fuera la mesa, justo al lado de donde dice la mesa. -->
+          <span>Ver pedido</span>
           <span>{{ sharedTotalLabel() }}</span>
         </a>
       </footer>

@@ -33,6 +33,8 @@ export interface JoinTableCommand {
   readonly tableId: string;
   readonly nickname: string;
   readonly currency: CurrencyCode;
+  /** Quien vuelve a la misma mesa; ausente la primera vez. */
+  readonly dinerId?: string | undefined;
 }
 
 export interface JoinResult {
@@ -71,7 +73,14 @@ export function joinTable(deps: {
         cart: emptyCart(command.currency),
       };
 
-    const dinerId = deps.newId();
+    // Quien vuelve trae su id: cerrar la pestaña o quedarse sin batería no
+    // debería obligarla a entrar con otro nombre y perder su pedido. Se
+    // acepta sólo si esa persona está realmente sentada en esta mesa.
+    const vuelve =
+      command.dinerId !== undefined &&
+      state.session.diners.some((diner) => diner.id === command.dinerId);
+
+    const dinerId = vuelve && command.dinerId !== undefined ? command.dinerId : deps.newId();
     const joined = joinSession(state.session, {
       id: dinerId,
       nickname: command.nickname,

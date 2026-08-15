@@ -2,7 +2,10 @@
 .fab {
   position: fixed;
   right: 16px;
-  bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  /* Cada pantalla dice cuánto ocupa lo que tiene fijo abajo, así el timbre
+     se corre por encima en vez de taparlo. La cuenta y el carrito tienen su
+     barra de total ahí, y sin esto el precio quedaba debajo del botón. */
+  bottom: calc(var(--itadaki-call-offset, 5.75rem) + env(safe-area-inset-bottom));
   z-index: 40;
   display: grid;
   place-items: center;

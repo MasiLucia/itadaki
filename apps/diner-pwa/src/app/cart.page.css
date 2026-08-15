@@ -1,3 +1,9 @@
+/* La barra de total vive abajo: el timbre se corre por encima para no
+   taparla, que es donde el comensal mira el precio. */
+:host {
+  --itadaki-call-offset: 6.5rem;
+}
+
 :host {
   display: flex;
   flex-direction: column;

@@ -1,3 +1,9 @@
+/* La barra de total vive abajo: el timbre se corre por encima para no
+   taparla, que es donde el comensal mira el precio. */
+:host {
+  --itadaki-call-offset: 6.5rem;
+}
+
 :host { display: flex; flex-direction: column; min-height: 100dvh; background: var(--itadaki-surface); }
 .pad { padding: 20px 18px 8px; }
 .eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 1.5px; color: var(--itadaki-ink-faint); text-transform: uppercase; margin: 0; }
