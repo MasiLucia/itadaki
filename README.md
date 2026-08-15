@@ -146,9 +146,31 @@ proveedor de correo o con Postgres caído, y avisa si las fotos quedan en disco
 local. Las migraciones se aplican con `npm run db:seed` apuntando a
 `DATABASE_ADMIN_URL`.
 
-Las cuatro apps del navegador son estáticas: `npx ng build <app>` y servir
-`dist/<app>/browser` desde donde quieras, completando el
-`<meta name="itadaki-api">` de cada `index.html` con la URL de la API.
+Las cuatro apps del navegador son estáticas: `npm run build:<app>` y servir
+`dist/<app>/browser` desde donde quieras. La URL de la API se lee en runtime
+del `<meta name="itadaki-api">` de cada `index.html`, así que el mismo build
+sirve para cualquier despliegue.
+
+### Vercel
+
+Cuatro proyectos sobre este mismo repositorio. El `vercel.json` de la raíz
+vale para los cuatro — trae el rewrite que hace falta porque son SPA: entrar
+directo a `/bienvenida?t=...`, que es lo que hace un QR, tiene que servir el
+`index.html` en vez de buscar un archivo con ese nombre.
+
+Lo que cambia en cada proyecto va en la interfaz de Vercel, porque un solo
+archivo no puede describir cuatro apps:
+
+| Proyecto | Build Command | Output Directory |
+|----------|---------------|------------------|
+| comensal | `npm run build:comensal` | `dist/diner-pwa/browser` |
+| cocina   | `npm run build:cocina`   | `dist/kds-web/browser` |
+| admin    | `npm run build:admin`    | `dist/admin-web/browser` |
+| salón    | `npm run build:salon`    | `dist/floor-web/browser` |
+
+El `/browser` del final es obligatorio: Angular deja ahí el `index.html`, y
+apuntar un nivel más arriba publica una carpeta sin índice — la raíz da 404.
+Framework Preset en **Other**; el preset de Angular adivina otra carpeta.
 
 ## Pendiente antes de producción
 
