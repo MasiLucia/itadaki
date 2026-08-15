@@ -18,6 +18,16 @@ export const submitOrderSchema = z.object({
     )
     .min(1)
     .max(50),
+  /**
+   * Qué líneas del carrito compartido corresponden a estas comandas.
+   *
+   * El servidor las borra al crear la orden. Van por id y no "todo el
+   * carrito": alguien de la mesa puede haber agregado un plato mientras este
+   * envío viajaba, y ese plato todavía no fue a la cocina.
+   *
+   * Opcional para no romper a un cliente viejo, que sigue vaciando a mano.
+   */
+  lineIds: z.array(z.string().min(1).max(64)).max(50).default([]),
 });
 
 export const advanceOrderSchema = z.object({

@@ -9,7 +9,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { advanceOrder, submitOrder } from '@itadaki/ordering/application';
+import { advanceOrder, clearSubmittedLines, submitOrder } from '@itadaki/ordering/application';
 import { type DinerScope, Public, RequirePermission, Scope, TableScoped, TenantId } from './auth';
 import { RateLimit } from './rate-limit.guard';
 import { CatalogService } from './catalog.service';
@@ -129,6 +129,18 @@ export class OrdersController {
       const status =
         result.error.kind === 'PRODUCT_UNAVAILABLE' ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST;
       throw new HttpException(result.error, status);
+    }
+
+    // La comanda ya está en la cocina: si el vaciado falla, el pedido vale
+    // igual. Lo que no puede pasar es lo que pasaba antes — que el carrito
+    // quede lleno y la mesa mande todo una segunda vez.
+    if (parsed.data.lineIds.length > 0) {
+      const clear = clearSubmittedLines({ sessions: this.sessions.store, events: this.realtime });
+      await clear({
+        tenantId,
+        sessionId: parsed.data.sessionId,
+        lineIds: parsed.data.lineIds,
+      });
     }
 
     return toOrderDto(result.value);
