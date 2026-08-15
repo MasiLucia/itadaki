@@ -95,7 +95,19 @@ export class SessionsController {
    * what is left is the narrower question: a table token unlocks only its own
    * table, while a staff token is not bound to any single one.
    */
-  private async sessionInScope(scope: DinerScope, sessionId: string): Promise<SessionState> {
+  /**
+   * La sesión que el QR escaneado abrió, o un error.
+   *
+   * `mustBeOpen` para todo lo que cambia el pedido: alguien más de la mesa
+   * pudo cerrar la cuenta mientras esta persona seguía eligiendo, y su
+   * teléfono no se enteró. Leer una sesión cerrada sí está bien — es lo que
+   * deja ver el detalle de lo que se acaba de pagar.
+   */
+  private async sessionInScope(
+    scope: DinerScope,
+    sessionId: string,
+    mustBeOpen = false,
+  ): Promise<SessionState> {
     const found = await this.sessions.store.findById(scope.tenantId, sessionId);
     if (found.isErr()) {
       throw new HttpException(found.error, HttpStatus.NOT_FOUND);
@@ -103,6 +115,10 @@ export class SessionsController {
 
     if (scope.tableId !== null && found.value.session.tableId !== scope.tableId) {
       throw new HttpException({ kind: 'WRONG_TABLE' }, HttpStatus.FORBIDDEN);
+    }
+
+    if (mustBeOpen && found.value.session.status === 'CLOSED') {
+      throw new HttpException({ kind: 'SESSION_CLOSED' }, HttpStatus.CONFLICT);
     }
 
     return found.value;
@@ -208,7 +224,7 @@ export class SessionsController {
       throw new HttpException(parsed.error.issues, HttpStatus.BAD_REQUEST);
     }
 
-    await this.sessionInScope(scope, sessionId);
+    await this.sessionInScope(scope, sessionId, true);
     const tenantId = scope.tenantId;
 
     const priced = await this.catalog.pricer.price(tenantId, {
@@ -261,7 +277,7 @@ export class SessionsController {
       throw new HttpException(parsed.error.issues, HttpStatus.BAD_REQUEST);
     }
 
-    await this.sessionInScope(scope, sessionId);
+    await this.sessionInScope(scope, sessionId, true);
     const tenantId = scope.tenantId;
 
     const run = changeSharedLine({ sessions: this.sessions.store, events: this.realtime });
@@ -294,7 +310,7 @@ export class SessionsController {
       throw new HttpException(parsed.error.issues, HttpStatus.BAD_REQUEST);
     }
 
-    await this.sessionInScope(scope, sessionId);
+    await this.sessionInScope(scope, sessionId, true);
     const tenantId = scope.tenantId;
 
     const run = leaveTable({ sessions: this.sessions.store, events: this.realtime });

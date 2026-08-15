@@ -33,6 +33,11 @@ export function blockFrom(response: FailedResponse): TableBlock | null {
   if (response.kind === 'INVALID_TABLE_TOKEN') return 'EXPIRED_TOKEN';
   if (response.sessionStatus === 'CLOSED') return 'SESSION_CLOSED';
 
+  // Alguien más de la mesa cerró la cuenta mientras esta persona seguía
+  // eligiendo: la API rechaza el pedido y este es el aviso de que la comida
+  // ya terminó, en vez de un error suelto sobre una pantalla que sigue viva.
+  if (response.kind === 'SESSION_CLOSED') return 'SESSION_CLOSED';
+
   // Only the session's own disappearance ends the meal — never a missing bill,
   // dish, or order.
   if (response.aboutSession === true && response.status === 404) {

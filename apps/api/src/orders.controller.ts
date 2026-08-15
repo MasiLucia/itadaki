@@ -100,6 +100,14 @@ export class OrdersController {
       throw new HttpException({ kind: 'WRONG_TABLE' }, HttpStatus.FORBIDDEN);
     }
 
+    // Alguien más de la mesa pudo cerrar la cuenta mientras esta persona
+    // seguía eligiendo. Su teléfono no se enteró, y sin este control el plato
+    // entraría a la cocina para una cuenta ya pagada — comida que sale y que
+    // nadie va a cobrar.
+    if (session.value.session.status === 'CLOSED') {
+      throw new HttpException({ kind: 'SESSION_CLOSED' }, HttpStatus.CONFLICT);
+    }
+
     const run = submitOrder({
       orders: this.orders.store,
       pricer: this.catalog.pricer,

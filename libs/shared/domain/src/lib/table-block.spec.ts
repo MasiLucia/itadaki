@@ -54,3 +54,15 @@ describe('reading a failure the diner cannot retry past', () => {
     expect(blockFrom({ status: 409, kind: 'PRODUCT_UNAVAILABLE' })).toBeNull();
   });
 });
+
+describe('cuando otro de la mesa cerró la cuenta', () => {
+  it('termina la comida para todos, no sólo para quien cerró', () => {
+    // El teléfono del otro comensal no se enteró: seguía eligiendo platos.
+    // Sin esto vería un error suelto sobre una carta que parece viva.
+    expect(blockFrom({ kind: 'SESSION_CLOSED', status: 409 })).toBe('SESSION_CLOSED');
+  });
+
+  it('no confunde un plato que se acabó con la mesa cerrada', () => {
+    expect(blockFrom({ kind: 'PRODUCT_UNAVAILABLE', status: 409 })).toBeNull();
+  });
+});
