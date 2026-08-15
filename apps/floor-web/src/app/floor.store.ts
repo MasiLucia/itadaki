@@ -89,6 +89,33 @@ export class FloorStore {
   readonly connected = signal(false);
 
   /**
+   * Lo que está listo, agrupado por mesa: un viaje, una tarjeta.
+   *
+   * Antes cada plato era su propia fila, así que una mesa con cuatro platos
+   * listos aparecía cuatro veces seguidas y el mozo tenía que darse cuenta
+   * solo de que era el mismo viaje.
+   */
+  readonly pickupsByTable = computed(() => {
+    const mesas = new Map<
+      string,
+      { tableId: string; dishes: Pickup[]; waitingSince: number }
+    >();
+
+    for (const pickup of this.pickups()) {
+      const actual = mesas.get(pickup.tableId) ?? {
+        tableId: pickup.tableId,
+        dishes: [],
+        waitingSince: Date.now(),
+      };
+      actual.dishes.push(pickup);
+      mesas.set(pickup.tableId, actual);
+    }
+
+    // Las mesas con más platos primero: es el viaje que más rinde.
+    return [...mesas.values()].sort((a, b) => b.dishes.length - a.dishes.length);
+  });
+
+  /**
    * Dishes the kitchen has finished, one row each.
    *
    * READY only: anything earlier is still being cooked, and a delivered dish
@@ -174,6 +201,13 @@ export class FloorStore {
 
     await this.outbox.enqueue(`${API}/calls/${callId}/acknowledge`, 'PATCH', {});
     if (this.pending() === 0) await this.refresh();
+  }
+
+  /** Lleva toda la mesa de una: es un viaje, no cuatro. */
+  async deliverTable(dishes: readonly Pickup[]): Promise<void> {
+    for (const dish of dishes) {
+      await this.deliver(dish.orderId, dish.itemId);
+    }
   }
 
   /** Marks a dish as carried out to the table. */

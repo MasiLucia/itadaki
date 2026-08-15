@@ -99,31 +99,63 @@ const CALL_LABELS: Record<string, string> = {
           }
         </h2>
 
-        @for (dish of store.pickups(); track dish.itemId) {
-          <article class="card pickup">
-            <div class="card-main">
-              <span class="table">Mesa {{ tableNumber(dish.tableId) }}</span>
-              <span class="dish">{{ dish.quantity }}× {{ dish.name }}</span>
-              @if (dish.notes !== '') {
-                <span class="note">"{{ dish.notes }}"</span>
+        <!-- Una tarjeta por mesa, no por plato: es un viaje. Antes una mesa
+             con cuatro platos listos ocupaba cuatro filas seguidas y el mozo
+             tenía que darse cuenta solo de que era el mismo viaje. -->
+        @for (mesa of store.pickupsByTable(); track mesa.tableId) {
+          <article class="trip">
+            <header class="trip-head">
+              <span class="trip-table">Mesa {{ tableNumber(mesa.tableId) }}</span>
+              <span class="trip-count">
+                {{ mesa.dishes.length }} {{ mesa.dishes.length === 1 ? 'plato' : 'platos' }}
+              </span>
+            </header>
+
+            <ul class="trip-dishes">
+              @for (dish of mesa.dishes; track dish.itemId) {
+                <li class="trip-dish">
+                  <span class="trip-qty">{{ dish.quantity }}</span>
+                  <span class="trip-name">{{ dish.name }}</span>
+                  @if (dish.notes !== '') {
+                    <span class="note">"{{ dish.notes }}"</span>
+                  }
+                </li>
               }
-            </div>
-            <button type="button" class="action" (click)="deliver(dish)">Entregado</button>
+            </ul>
+
+            <button type="button" class="trip-action" (click)="deliverTable(mesa.dishes)">
+              Llevé la mesa {{ tableNumber(mesa.tableId) }} →
+            </button>
           </article>
         } @empty {
           <p class="quiet">Nada esperando en la barra.</p>
         }
       </section>
 
-      <!-- Context, not a to-do list: what to say when someone asks "falta mucho?" -->
+      <!-- Contexto, no una tarea: sirve para contestar "¿falta mucho?".
+           Plegado por defecto porque con trece mesas activas ocupaba media
+           pantalla compitiendo con lo que sí hay que hacer. -->
       @if (store.cooking().length > 0) {
         <section class="block" aria-labelledby="cooking-title">
-          <h2 class="block-title quiet-title" id="cooking-title">En cocina</h2>
-          @for (ticket of store.cooking(); track ticket.id) {
-            <p class="cooking-row">
-              <span class="table small">Mesa {{ tableNumber(ticket.tableId ?? '') }}</span>
-              <span class="cooking-items">{{ pending(ticket.items) }}</span>
-            </p>
+          <button
+            type="button"
+            class="cooking-toggle"
+            id="cooking-title"
+            [attr.aria-expanded]="showCooking()"
+            (click)="showCooking.set(!showCooking())"
+          >
+            <span class="quiet-title">En cocina</span>
+            <span class="cooking-count">{{ store.cooking().length }} mesas</span>
+            <span class="cooking-chevron">{{ showCooking() ? '−' : '+' }}</span>
+          </button>
+
+          @if (showCooking()) {
+            @for (ticket of store.cooking(); track ticket.id) {
+              <p class="cooking-row">
+                <span class="table small">Mesa {{ tableNumber(ticket.tableId ?? '') }}</span>
+                <span class="cooking-items">{{ pending(ticket.items) }}</span>
+              </p>
+            }
           }
         </section>
       }
@@ -133,6 +165,9 @@ const CALL_LABELS: Record<string, string> = {
 export class FloorComponent implements OnDestroy {
   protected readonly auth = inject(AuthStore);
   protected readonly store = inject(FloorStore);
+
+  /** "En cocina" arranca plegado: es contexto, no trabajo pendiente. */
+  protected readonly showCooking = signal(false);
 
   private readonly tick = signal(Date.now());
   private readonly timer: ReturnType<typeof setInterval>;
@@ -180,6 +215,11 @@ export class FloorComponent implements OnDestroy {
 
   protected async attend(call: CallDto): Promise<void> {
     await this.store.attend(call.id);
+  }
+
+  /** Un viaje entero: la mesa completa de una vez. */
+  protected async deliverTable(dishes: readonly Pickup[]): Promise<void> {
+    await this.store.deliverTable(dishes);
   }
 
   protected async deliver(dish: Pickup): Promise<void> {

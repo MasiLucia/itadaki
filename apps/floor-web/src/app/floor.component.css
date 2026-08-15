@@ -262,3 +262,127 @@
 @media (prefers-reduced-motion: reduce) {
   .dot { animation: none; }
 }
+
+/* ---- Un viaje a la mesa, no una lista de platos ---- */
+
+/*
+ * El bloque de lo listo es lo único que exige acción ahora, así que pesa
+ * visualmente más que los llamados y mucho más que "en cocina", que es
+ * contexto. Antes los tres bloques se veían igual y todo era una lista.
+ */
+.trip {
+  margin-bottom: 0.85rem;
+  border-radius: var(--itadaki-radius-card);
+  border: 1px solid var(--itadaki-border);
+  border-left: 6px solid var(--itadaki-status-ready, #15803d);
+  background: var(--itadaki-surface);
+  overflow: hidden;
+}
+
+.trip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.75rem 0.9rem 0.5rem;
+}
+
+/* El número de mesa es lo que el mozo busca al levantar la vista. */
+.trip-table {
+  font-family: var(--itadaki-font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.trip-count {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--itadaki-ink-soft);
+}
+
+.trip-dishes {
+  margin: 0;
+  padding: 0 0.9rem 0.6rem;
+  list-style: none;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.trip-dish {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.trip-qty {
+  min-width: 1.3rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--itadaki-radius-chip);
+  background: var(--itadaki-surface-sunken);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.trip-name {
+  font-weight: 600;
+}
+
+/* Una sola acción por viaje, del ancho del pulgar: el mozo tiene una mano
+   libre y la otra con la bandeja. */
+.trip-action {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  border: none;
+  border-top: 1px solid var(--itadaki-border);
+  background: var(--itadaki-ink);
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.trip-action:active {
+  background: var(--itadaki-accent);
+}
+
+/* "En cocina" es para contestar "¿falta mucho?", no una tarea: se apaga para
+   que no compita con lo que sí hay que hacer. */
+.quiet-title {
+  opacity: 0.75;
+}
+
+/* "En cocina" plegado: una línea en vez de una fila por mesa. Con trece
+   mesas activas ocupaba media pantalla compitiendo con lo que sí hay que
+   hacer, siendo que sólo sirve para contestar "¿falta mucho?". */
+.cooking-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.6rem 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cooking-count {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-soft);
+}
+
+.cooking-chevron {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--itadaki-ink-soft);
+}
