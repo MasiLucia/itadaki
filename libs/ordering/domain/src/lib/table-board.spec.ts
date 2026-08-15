@@ -1,4 +1,10 @@
-import { type BoardTicket, type TableCard, groupByTable, splitByUrgency } from './table-board';
+import {
+  type BoardTicket,
+  type TableCard,
+  groupByTable,
+  layoutFor,
+  splitByUrgency,
+} from './table-board';
 
 const plato = (
   id: string,
@@ -146,5 +152,29 @@ describe('qué se muestra abierto cuando la cocina está llena', () => {
 
   it('aguanta un tablero vacío', () => {
     expect(splitByUrgency([], espera, 15, 5)).toEqual({ open: [], folded: [] });
+  });
+});
+
+describe('cómo se muestra el tablero según la pantalla', () => {
+  it('usa columnas en la tablet de la cocina', () => {
+    expect(layoutFor(1280)).toBe('columns');
+  });
+
+  it('pasa a pestañas cuando las cuatro columnas ya no entran', () => {
+    // Una tablet vertical: cuatro columnas ahí quedan ilegibles.
+    expect(layoutFor(820)).toBe('tabs');
+  });
+
+  it('usa una sola lista en el teléfono', () => {
+    // En columnas, un teléfono apila las cuatro etapas y deja "listo" al
+    // final del scroll — justo lo que el cocinero necesita ver primero.
+    expect(layoutFor(390)).toBe('list');
+  });
+
+  it('cambia justo en el límite, no antes', () => {
+    expect(layoutFor(640)).toBe('tabs');
+    expect(layoutFor(639)).toBe('list');
+    expect(layoutFor(1100)).toBe('columns');
+    expect(layoutFor(1099)).toBe('tabs');
   });
 });

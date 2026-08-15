@@ -133,3 +133,24 @@ export function splitByUrgency(
 
   return { open, folded };
 }
+
+/**
+ * Cómo se muestra el tablero, según en qué está corriendo.
+ *
+ * No es lo mismo la tablet fija de la cocina que el celular del cocinero de
+ * un local chico: en columnas, un celular apila las cuatro etapas y deja
+ * "listo" al final del scroll — justo lo que hay que sacar.
+ */
+export type BoardLayout = 'columns' | 'tabs' | 'list';
+
+/** Debajo de esto, las cuatro columnas no entran sin volverse ilegibles. */
+export const TABS_BELOW = 1100;
+
+/** Debajo de esto es un teléfono: una mano, un pulgar, scroll y nada más. */
+export const LIST_BELOW = 640;
+
+export function layoutFor(width: number): BoardLayout {
+  if (width < LIST_BELOW) return 'list';
+  if (width < TABS_BELOW) return 'tabs';
+  return 'columns';
+}

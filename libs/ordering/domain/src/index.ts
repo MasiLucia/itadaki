@@ -71,4 +71,8 @@ export {
   OPEN_CARDS,
   groupByTable,
   splitByUrgency,
+  type BoardLayout,
+  layoutFor,
+  LIST_BELOW,
+  TABS_BELOW,
 } from './lib/table-board';

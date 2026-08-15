@@ -9,7 +9,13 @@ import {
   signal,
 } from '@angular/core';
 import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
-import { type TableCard, groupByTable, splitByUrgency } from '@itadaki/ordering/domain';
+import {
+  type BoardLayout,
+  type TableCard,
+  groupByTable,
+  layoutFor,
+  splitByUrgency,
+} from '@itadaki/ordering/domain';
 import { KdsStore, type TicketDto } from './kds.store';
 
 interface Column {
@@ -36,6 +42,9 @@ const STATIONS: ReadonlyArray<{ id: string; label: string }> = [
 
 /** Minutes a ticket may wait before the board flags it. */
 const API_URL = apiUrl();
+
+/** En el teléfono entra menos: tres mesas abiertas llenan la pantalla. */
+const FEED_OPEN = 3;
 
 const SLA_WARNING = 8;
 const SLA_LATE = 15;
@@ -89,8 +98,9 @@ const SLA_LATE = 15;
       </div>
     </header>
 
-    <div class="board">
-      @for (column of columns; track column.status) {
+    @if (layout() !== 'list') {
+    <div class="board" [attr.data-layout]="layout()">
+      @for (column of visibleColumns(); track column.status) {
         <section class="col" [attr.data-status]="column.status">
           <header class="col-head">
             <h2 class="col-name">{{ column.label }}</h2>
@@ -221,6 +231,106 @@ const SLA_LATE = 15;
       }
     </div>
     }
+
+    @if (layout() === 'tabs') {
+      <!-- Tablet vertical: cuatro columnas ahí quedan ilegibles, así que se
+           ve una etapa por vez a pantalla completa. Los contadores en las
+           solapas mantienen la vista de conjunto que las columnas daban. -->
+      <nav class="tabs" aria-label="Etapa">
+        @for (column of columns; track column.status) {
+          <button
+            type="button"
+            class="tab"
+            [class.on]="activeColumn() === column.status"
+            [attr.data-status]="column.status"
+            (click)="activeColumn.set(column.status)"
+          >
+            {{ column.label }}
+            <span class="tab-count">{{ countFor(column.status) }}</span>
+          </button>
+        }
+      </nav>
+    }
+
+    @if (layout() === 'list') {
+      <!-- Teléfono: una sola lista por orden de llegada. Sin etapas, porque
+           apilarlas dejaba "listo" al final del scroll — justo lo que el
+           cocinero necesita ver primero. -->
+      <div class="feed">
+        @for (card of feedOpen(); track card.key) {
+          <article class="feed-card" [attr.data-sla]="slaOf(card)">
+            <header class="feed-head">
+              <span class="feed-table">mesa {{ tableNumber(card) }}</span>
+              <span class="feed-stage" [attr.data-status]="card.status">
+                {{ columnLabel(card.status) }}
+              </span>
+              <span class="feed-time">{{ waited(card) }}</span>
+            </header>
+
+            <ul class="ticket-items">
+              @for (item of visibleItems(card); track item.orderId + item.id) {
+                <li class="ticket-item" [attr.data-item-status]="item.status">
+                  <span class="qty">{{ item.quantity }}</span>
+                  <span class="item-body">
+                    <span class="item-name">{{ item.name }}</span>
+                    @if (item.notes !== '') {
+                      <span class="item-note">{{ item.notes }}</span>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+
+            @if (nextStepFor(card); as step) {
+              <button type="button" class="ticket-btn" (click)="advanceCard(card, step.next)">
+                {{ step.action }} · todo →
+              </button>
+            }
+          </article>
+        } @empty {
+          <p class="empty">sin pedidos</p>
+        }
+
+        <!-- Las que esperan atrás: una línea cada una, igual que en la
+             tablet. Mostrarlas enteras daba cinco pantallas de scroll. -->
+        @for (card of feedFolded(); track card.key) {
+          @if (expanded().has(card.key)) {
+            <article class="feed-card" [attr.data-sla]="slaOf(card)">
+              <header class="feed-head">
+                <span class="feed-table">mesa {{ tableNumber(card) }}</span>
+                <button type="button" class="fold-btn" (click)="toggle(card.key)">plegar</button>
+              </header>
+              <ul class="ticket-items">
+                @for (item of visibleItems(card); track item.orderId + item.id) {
+                  <li class="ticket-item" [attr.data-item-status]="item.status">
+                    <span class="qty">{{ item.quantity }}</span>
+                    <span class="item-body"><span class="item-name">{{ item.name }}</span></span>
+                  </li>
+                }
+              </ul>
+              @if (nextStepFor(card); as step) {
+                <button type="button" class="ticket-btn" (click)="advanceCard(card, step.next)">
+                  {{ step.action }} · todo →
+                </button>
+              }
+            </article>
+          } @else {
+            <button
+              type="button"
+              class="folded"
+              [attr.data-sla]="slaOf(card)"
+              (click)="toggle(card.key)"
+            >
+              <span class="folded-table">mesa {{ tableNumber(card) }}</span>
+              <span class="folded-count">{{ card.items.length }} platos</span>
+              <span class="folded-time">{{ waited(card) }}</span>
+            </button>
+          }
+        }
+      </div>
+    }
+
+    }
   `,
 })
 export class KdsComponent implements OnDestroy {
@@ -230,6 +340,21 @@ export class KdsComponent implements OnDestroy {
   protected readonly stations = STATIONS;
 
   protected readonly activeStation = signal('ALL');
+
+  /**
+   * Qué tan ancha está la pantalla, para elegir cómo mostrar el tablero.
+   *
+   * La tablet fija de la cocina y el celular del cocinero de un local chico
+   * no son el mismo caso: en columnas, un teléfono apila las cuatro etapas y
+   * deja "listo" al final del scroll — justo lo que hay que sacar.
+   */
+  private readonly width = signal(
+    typeof window === 'undefined' ? 1280 : window.innerWidth,
+  );
+  protected readonly layout = computed<BoardLayout>(() => layoutFor(this.width()));
+
+  /** En pestañas y en lista se ve una etapa por vez; ésta es la que se ve. */
+  protected readonly activeColumn = signal(COLUMNS[0]?.status ?? 'SENT');
   private readonly tick = signal(Date.now());
   private readonly timer: ReturnType<typeof setInterval>;
 
@@ -266,6 +391,11 @@ export class KdsComponent implements OnDestroy {
 
   constructor() {
     this.auth.configure(API_URL);
+
+    // Girar la tablet cambia el layout, así que el ancho se sigue mirando.
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', () => this.width.set(window.innerWidth));
+    }
     void this.auth.restore().then(() => {
       if (this.auth.signedIn()) this.store.connect();
     });
@@ -306,6 +436,49 @@ export class KdsComponent implements OnDestroy {
   private split(status: string): { open: readonly TableCard[]; folded: readonly TableCard[] } {
     const cards = this.byStatus().get(status) ?? [];
     return splitByUrgency(cards, (card) => this.minutesWaiting(card), SLA_LATE);
+  }
+
+  /**
+   * Todo el tablero en una sola lista, para el teléfono.
+   *
+   * Sin etapas: el cocinero baja y va sacando, con el estado a la vista en
+   * cada tarjeta. Apilar las cuatro columnas dejaba "listo" al final del
+   * scroll, que es justo lo que hay que ver primero.
+   */
+  /**
+   * La lista del teléfono: lo urgente abierto, el resto plegado.
+   *
+   * Mismo criterio que en columnas. Mostrar las catorce mesas enteras daba
+   * cinco pantallas de scroll — peor que el layout que vino a reemplazar.
+   * En una pantalla chica se abren menos, porque entra menos.
+   */
+  private readonly feedSplit = computed(() =>
+    splitByUrgency(this.cards(), (card) => this.minutesWaiting(card), SLA_LATE, FEED_OPEN),
+  );
+
+  protected readonly feedOpen = computed(() => this.feedSplit().open);
+  protected readonly feedFolded = computed(() => this.feedSplit().folded);
+
+  /**
+   * Las etapas que se ven ahora.
+   *
+   * En columnas están las cuatro; en pestañas, sólo la elegida — que es lo
+   * que hace que entre en una tablet vertical sin achicarse hasta ser
+   * ilegible.
+   */
+  protected readonly visibleColumns = computed(() =>
+    this.layout() === 'tabs'
+      ? COLUMNS.filter((column) => column.status === this.activeColumn())
+      : COLUMNS,
+  );
+
+  /** El paso siguiente de una tarjeta, para el botón de la lista. */
+  protected nextStepFor(card: TableCard): { next: string; action: string } | null {
+    return this.nextFor(card.status);
+  }
+
+  protected columnLabel(status: string): string {
+    return COLUMNS.find((column) => column.status === status)?.label ?? status;
   }
 
   /** Todas las mesas de esa columna: el contador del encabezado las cuenta

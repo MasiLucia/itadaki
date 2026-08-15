@@ -136,12 +136,10 @@
   align-items: start;
 }
 
-@media (max-width: 1240px) {
-  .board { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 680px) {
-  .board { grid-template-columns: 1fr; }
+/* Una sola etapa a pantalla completa: es lo que hace que entre en una
+   tablet vertical sin achicar las columnas hasta volverlas ilegibles. */
+.board[data-layout='tabs'] {
+  grid-template-columns: 1fr;
 }
 
 /**
@@ -533,4 +531,109 @@
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;
+}
+
+/* ---- Pestañas: tablet vertical ---- */
+
+.tabs {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.7rem 0.4rem;
+  border: 1px solid oklch(38% 0.02 40);
+  border-bottom: 3px solid transparent;
+  border-radius: var(--itadaki-radius-card);
+  background: oklch(26% 0.015 40);
+  color: oklch(78% 0.02 70);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tab.on {
+  background: oklch(32% 0.02 40);
+  color: white;
+  border-bottom-color: currentColor;
+}
+
+/* El contador es lo que mantiene la vista de conjunto que daban las
+   columnas: se ve cuánto hay atrás sin entrar a mirarlo. */
+.tab-count {
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Lista: teléfono ---- */
+
+.feed {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.feed-card {
+  padding: 0.9rem;
+  border-radius: var(--itadaki-radius-card);
+  border-left: 5px solid oklch(50% 0.02 40);
+  background: var(--itadaki-surface);
+  color: var(--itadaki-ink);
+}
+
+.feed-card[data-sla='warning'] {
+  border-left-color: var(--itadaki-status-cooking);
+}
+
+.feed-card[data-sla='late'] {
+  border-left-color: var(--itadaki-status-late);
+}
+
+.feed-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.feed-table {
+  font-family: var(--itadaki-font-display);
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+/* La etapa viaja en la tarjeta porque en el teléfono no hay columnas que la
+   digan; sin esto el cocinero no sabe si el plato ya está en la parrilla. */
+.feed-stage {
+  justify-self: start;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-surface-sunken);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.feed-time {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--itadaki-ink-soft);
+}
+
+/* Un pulgar, no un mouse: el botón ocupa el ancho y es alto de tocar. */
+.feed-card .ticket-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 0.7rem;
+  font-size: 1rem;
 }
