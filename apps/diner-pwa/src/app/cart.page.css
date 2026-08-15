@@ -294,6 +294,18 @@
   text-align: center;
 }
 
+/* Explicación, no error: el pedido salió bien, sólo que lo mandó otro. */
+.sent-note {
+  margin: 0.6rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--itadaki-radius-chip);
+  background: oklch(94% 0.05 150);
+  color: oklch(35% 0.08 150);
+  font-size: 0.83rem;
+  font-weight: 600;
+  text-align: center;
+}
+
 .line-actions {
   display: flex;
   align-items: center;

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { type CartLine, lineTotal } from '@itadaki/ordering/domain';
 import { Money } from '@itadaki/shared/domain';
@@ -112,13 +112,21 @@ import { OrderService } from './order.service';
               <button
                 type="button"
                 class="cta"
-                [disabled]="state.kind === 'sending' || myLineCount() === 0"
+                [disabled]="state.kind === 'sending' || tableLineCount() === 0"
                 (click)="sendShared()"
               >
                 {{ sendLabel(state.kind) }}
               </button>
               @if (state.kind === 'failed') {
                 <p class="error-note" role="alert">{{ state.message }} — probá de nuevo</p>
+              }
+              @if (sentByOther()) {
+                <!-- El carrito se vació sin que esta persona tocara nada:
+                     alguien más de la mesa envió mientras elegía. Sin esto,
+                     los platos desaparecen de la pantalla sin explicación. -->
+                <p class="sent-note" role="status">
+                  Alguien de la mesa envió el pedido a la cocina
+                </p>
               }
               <a class="link foot-link" routerLink="/cuenta">Ver la cuenta</a>
             }
@@ -273,14 +281,40 @@ export class CartPage {
     void this.session.changeLine(line.id, 0);
   }
 
-  /** Only what this diner added: each phone sends its own lines. */
-  protected readonly myLineCount = computed(() => this.session.myLines().length);
+  /**
+   * Todo lo que la mesa tiene sin enviar, no sólo lo de este teléfono.
+   *
+   * Cada uno enviaba lo suyo, y una mesa de cuatro le dejaba a la cocina
+   * cuatro comandas separadas de la misma mesa, llegando en momentos
+   * distintos: la parrilla arrancaba sin saber que faltaban platos, y la
+   * comida salía desparejada.
+   */
+  protected readonly tableLineCount = computed(() => this.session.session()?.lines.length ?? 0);
+
+  /**
+   * Si el carrito se vació sin que esta persona enviara nada.
+   *
+   * Pasa cuando otro de la mesa toca "enviar" mientras alguien todavía elige:
+   * sus platos desaparecen de la pantalla, y sin este aviso parecería que la
+   * app los perdió.
+   */
+  private readonly hadLines = signal(false);
+  protected readonly sentByOther = computed(
+    () => this.hadLines() && this.tableLineCount() === 0 && this.orders.submitState().kind === 'idle',
+  );
+
+  /** Recuerda que había platos, para notar cuándo desaparecieron. */
+  private readonly watchCart = effect(() => {
+    if (this.tableLineCount() > 0) this.hadLines.set(true);
+  });
 
   protected sendLabel(kind: string): string {
     if (kind === 'sending') return 'Enviando…';
-    return this.myLineCount() === 0
-      ? 'Agregá algo para enviar'
-      : `Enviar ${this.myLineCount()} a cocina →`;
+    const total = this.tableLineCount();
+    if (total === 0) return 'Agregá algo para enviar';
+    // Decir "de la mesa" es lo que evita la sorpresa: quien toca el botón
+    // está enviando también lo que los demás eligieron.
+    return total === 1 ? 'Enviar 1 plato a cocina →' : `Enviar los ${total} platos de la mesa →`;
   }
 
   /**
@@ -294,7 +328,8 @@ export class CartPage {
     const dinerId = this.session.myDinerId();
     if (session === null || dinerId === null) return;
 
-    const lines = this.session.myLines();
+    // El carrito entero de la mesa, en una sola comanda.
+    const lines = this.session.session()?.lines ?? [];
     if (lines.length === 0) return;
 
     await this.orders.submitLines(
@@ -309,11 +344,11 @@ export class CartPage {
     );
   }
 
-  /** Clears the sent lines from the shared cart so they are not sent twice. */
+  /** Vacía el carrito compartido, para que nada se envíe dos veces. */
   protected async afterSend(): Promise<void> {
     const session = this.session.session();
     if (session !== null) {
-      for (const line of this.session.myLines()) {
+      for (const line of [...session.lines]) {
         await this.session.changeLine(line.id, 0);
       }
     }
