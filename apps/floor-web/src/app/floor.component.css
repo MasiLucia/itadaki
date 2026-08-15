@@ -386,3 +386,29 @@
   font-weight: 700;
   color: var(--itadaki-ink-soft);
 }
+
+/* Liberar una mesa que pagó en la caja y se fue.
+   Discreto a propósito: es la excepción, no la acción principal — la mesa se
+   libera sola al cerrar la cuenta. Y borra el pedido de quien todavía podría
+   estar comiendo, así que no debe invitar al toque distraído. */
+.release {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-pill);
+  background: transparent;
+  color: var(--itadaki-ink-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* El segundo toque sí se ve, porque es el que hace algo irreversible. */
+.release.confirm {
+  border-color: var(--itadaki-accent);
+  background: var(--itadaki-accent);
+  color: white;
+  font-weight: 700;
+}

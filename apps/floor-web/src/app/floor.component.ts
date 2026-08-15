@@ -154,6 +154,26 @@ const CALL_LABELS: Record<string, string> = {
               <p class="cooking-row">
                 <span class="table small">Mesa {{ tableNumber(ticket.tableId ?? '') }}</span>
                 <span class="cooking-items">{{ pending(ticket.items) }}</span>
+                <!-- Para la mesa que pagó en la caja y se fue: sin esto queda
+                     ocupada hasta el barrido, y el grupo siguiente escanea el
+                     QR y cae en el pedido de los anteriores. -->
+                @if (confirming() === ticket.sessionId) {
+                  <button
+                    type="button"
+                    class="release confirm"
+                    (click)="release(ticket.sessionId)"
+                  >
+                    ¿Seguro? Sí, liberar
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    class="release"
+                    (click)="confirming.set(ticket.sessionId)"
+                  >
+                    Liberar
+                  </button>
+                }
               </p>
             }
           }
@@ -168,6 +188,20 @@ export class FloorComponent implements OnDestroy {
 
   /** "En cocina" arranca plegado: es contexto, no trabajo pendiente. */
   protected readonly showCooking = signal(false);
+
+  /**
+   * Qué mesa está esperando confirmación para liberarse.
+   *
+   * Un toque de más borra el pedido de gente que todavía está comiendo, así
+   * que el botón pregunta antes — pero en dos toques, no con un diálogo que
+   * hay que leer con la bandeja en la mano.
+   */
+  protected readonly confirming = signal<string | null>(null);
+
+  protected async release(sessionId: string): Promise<void> {
+    this.confirming.set(null);
+    await this.store.releaseTable(sessionId);
+  }
 
   private readonly tick = signal(Date.now());
   private readonly timer: ReturnType<typeof setInterval>;

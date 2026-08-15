@@ -203,6 +203,22 @@ export class FloorStore {
     if (this.pending() === 0) await this.refresh();
   }
 
+  /**
+   * Libera una mesa que se fue sin cerrar la cuenta.
+   *
+   * Mucha gente paga en la caja y se va sin tocar el teléfono. Esa mesa queda
+   * ocupada hasta que corre el barrido automático, y mientras tanto el grupo
+   * siguiente escanea el QR y cae en el pedido de los anteriores.
+   */
+  async releaseTable(sessionId: string): Promise<void> {
+    const response = await fetch(`${API}/sessions/${sessionId}/release`, {
+      method: 'POST',
+      headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
+    });
+    if (this.auth.expired(response)) return;
+    if (response.ok) await this.refresh();
+  }
+
   /** Lleva toda la mesa de una: es un viaje, no cuatro. */
   async deliverTable(dishes: readonly Pickup[]): Promise<void> {
     for (const dish of dishes) {

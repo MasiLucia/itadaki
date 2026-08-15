@@ -12,12 +12,21 @@ import {
   addToSharedCart,
   changeSharedLine,
   joinTable,
+  closeTable,
   leaveTable,
   type SessionState,
 } from '@itadaki/ordering/application';
 import { groupByDiner } from '@itadaki/ordering/domain';
 import { z } from 'zod';
-import { type DinerScope, Public, Scope, TableScoped, resolveTableToken } from './auth';
+import {
+  type DinerScope,
+  Public,
+  RequirePermission,
+  Scope,
+  TableScoped,
+  TenantId,
+  resolveTableToken,
+} from './auth';
 import { RateLimit } from './rate-limit.guard';
 import { CatalogService } from './catalog.service';
 import { OrdersService } from './orders.service';
@@ -332,5 +341,29 @@ export class SessionsController {
       throw new HttpException(result.error, HttpStatus.CONFLICT);
     }
     return toSessionDto(result.value);
+  }
+
+  /**
+   * Libera una mesa a mano, desde la app del mozo.
+   *
+   * El camino normal es que la mesa se libere sola al cerrar la cuenta. Pero
+   * mucha gente paga en la caja y se va sin tocar el teléfono, y esa mesa
+   * queda ocupada hasta que corre el barrido: el grupo siguiente escanea el
+   * QR y cae en el pedido de los anteriores.
+   *
+   * Gated en `orders:advance`, el mismo permiso que mueve comandas: quien
+   * atiende el salón es quien sabe que la mesa se fue.
+   */
+  @RequirePermission('orders:advance')
+  @Post(':id/release')
+  async release(@Param('id') sessionId: string, @TenantId() tenantId: string) {
+    const run = closeTable({ sessions: this.sessions.store, events: this.realtime });
+    const result = await run({ tenantId, sessionId });
+
+    if (result.isErr()) {
+      throw new HttpException(result.error, HttpStatus.CONFLICT);
+    }
+    // Cerrar no devuelve la mesa: ya no hay nada que mostrar de ella.
+    return { released: true };
   }
 }

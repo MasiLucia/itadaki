@@ -5,12 +5,17 @@ import { database } from './database';
 import { log } from './logger';
 
 /**
- * How long a table may sit open before it is considered abandoned.
+ * Cuánto puede quedar abierta una mesa antes de darla por abandonada.
  *
- * Longer than any real meal: closing a session while people are still eating
- * would lose their cart, which is far worse than a table freed an hour late.
+ * Más que cualquier comida real: cerrar una mesa mientras la gente todavía
+ * come le borra el carrito, que es mucho peor que liberarla una hora tarde.
+ * Tres horas cubre una sobremesa larga y devuelve la mesa el mismo turno —
+ * ocho la dejaban ocupada hasta la madrugada.
+ *
+ * Es la red de seguridad, no el camino normal: la mesa se libera sola al
+ * cerrar la cuenta, y el mozo puede liberarla a mano cuando pagaron en caja.
  */
-const STALE_AFTER_HOURS = Number(process.env['SESSION_STALE_HOURS'] ?? 8);
+const STALE_AFTER_HOURS = Number(process.env['SESSION_STALE_HOURS'] ?? 3);
 const SWEEP_EVERY_MS = 30 * 60_000;
 
 @Injectable()
