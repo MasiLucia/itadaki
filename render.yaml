@@ -51,6 +51,19 @@ services:
       - key: MAIL_FROM
         sync: false
 
+      # Dónde viven los bytes de las fotos. Sin las cuatro, la API cae al disco
+      # del contenedor, que Render borra cada vez que el servicio se duerme o
+      # se redespliega: la fila en la base queda y la imagen da 404. Sirve
+      # cualquier S3 compatible — R2, B2, S3.
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+
 databases:
   - name: itadaki-db
     plan: free
