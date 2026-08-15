@@ -51,13 +51,17 @@ export class OrderService {
     }>,
     sessionId: string,
     dinerId: string,
+    lineIds: readonly string[] = [],
   ): Promise<void> {
     if (lines.length === 0) return;
 
     this.state.set({ kind: 'sending' });
     const clientRequestId = crypto.randomUUID();
 
-    const payload = { sessionId, dinerId, clientRequestId, lines };
+    // `lineIds` viaja con el pedido para que el servidor vacíe el carrito
+    // compartido en la misma operación: si lo hiciera este teléfono, las
+    // líneas de los demás no se irían y la mesa las enviaría de nuevo.
+    const payload = { sessionId, dinerId, clientRequestId, lines, lineIds };
 
     // Already offline: queue without attempting, so the diner is told the
     // truth immediately instead of watching a request time out.

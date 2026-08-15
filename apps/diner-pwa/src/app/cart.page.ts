@@ -341,17 +341,17 @@ export class CartPage {
       })),
       session.id,
       dinerId,
+      lines.map((line) => line.id),
     );
   }
 
-  /** Vacía el carrito compartido, para que nada se envíe dos veces. */
-  protected async afterSend(): Promise<void> {
-    const session = this.session.session();
-    if (session !== null) {
-      for (const line of [...session.lines]) {
-        await this.session.changeLine(line.id, 0);
-      }
-    }
+  /**
+   * El carrito compartido lo vacía el servidor al crear la orden, y el evento
+   * de sesión lo refleja en todos los teléfonos de la mesa. Acá sólo queda
+   * soltar el estado del botón, y sin depender de que alguien toque el link:
+   * antes, quien enviaba y cerraba la app dejaba el carrito lleno para el resto.
+   */
+  protected afterSend(): void {
     this.orders.reset();
   }
 
