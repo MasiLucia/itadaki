@@ -25,11 +25,13 @@ export {
   joinTable,
   addToSharedCart,
   changeSharedLine,
+  clearSubmittedLines,
   leaveTable,
   type JoinTableCommand,
   type JoinResult,
   type AddToSharedCartCommand,
   type ChangeLineCommand,
+  type ClearSubmittedCommand,
   type LeaveTableCommand,
   type SessionFailure,
 } from './lib/session-use-cases';

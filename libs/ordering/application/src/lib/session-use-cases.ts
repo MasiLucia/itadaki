@@ -195,6 +195,52 @@ export function changeSharedLine(deps: {
   };
 }
 
+export interface ClearSubmittedCommand {
+  readonly tenantId: string;
+  readonly sessionId: string;
+  readonly lineIds: readonly string[];
+}
+
+/**
+ * Saca del carrito compartido las líneas que ya se fueron a la cocina.
+ *
+ * Corre del lado del servidor, al crear la orden, y no desde el teléfono que
+ * envió: enviar manda el carrito entero de la mesa, pero cada comensal sólo
+ * puede borrar sus propias líneas (`canModify`). Las de los demás quedaban en
+ * pantalla como si nunca se hubieran mandado, alguien volvía a tocar enviar, y
+ * la cocina recibía la misma comanda dos veces.
+ *
+ * Sin control de dueño acá, entonces, a propósito: quien envía ya tenía
+ * permiso de mandar esos platos: borrarlos del carrito es el mismo acto.
+ *
+ * Borra por id y no vacía el carrito entero, porque alguien de la mesa pudo
+ * agregar un plato mientras el envío viajaba y ese plato todavía no se cocinó.
+ */
+export function clearSubmittedLines(deps: {
+  sessions: SessionReader & SessionWriter;
+  events: SessionEventPublisher;
+}) {
+  return async (command: ClearSubmittedCommand): Promise<Result<SessionState, SessionFailure>> => {
+    const saved = await deps.sessions.mutate(command.tenantId, command.sessionId, (state) =>
+      ok({
+        ...state,
+        cart: command.lineIds.reduce((cart, lineId) => removeLine(cart, lineId), state.cart),
+      }),
+    );
+
+    if (saved.isErr()) {
+      return err(saved.error);
+    }
+
+    await deps.events.sessionChanged({
+      tenantId: command.tenantId,
+      sessionId: command.sessionId,
+      reason: 'cart-changed',
+    });
+    return ok(saved.value);
+  };
+}
+
 export interface LeaveTableCommand {
   readonly tenantId: string;
   readonly sessionId: string;
