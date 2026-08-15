@@ -1,6 +1,9 @@
 {
   "name": "itadaki",
   "version": "0.0.1",
+  "engines": {
+    "node": ">=22"
+  },
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
@@ -21,7 +24,11 @@
     "db:trial": "npm run build:api && node dist/api/apps/api/src/manage-trial.js",
     "db:reset": "docker compose down -v && npm run db:up && npm run db:seed",
     "db:backup": "bash scripts/backup.sh",
-    "db:restore": "bash scripts/restore.sh"
+    "db:restore": "bash scripts/restore.sh",
+    "build:comensal": "ng build diner-pwa",
+    "build:cocina": "ng build kds-web",
+    "build:admin": "ng build admin-web",
+    "build:salon": "ng build floor-web"
   },
   "devDependencies": {
     "@angular/build": "^19.2.27",
