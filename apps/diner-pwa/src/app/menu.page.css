@@ -401,11 +401,10 @@
  * lee una carta de papel.
  */
 .card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.7rem;
   background: var(--itadaki-surface-raised);
   border-radius: var(--itadaki-radius-card);
   box-shadow: var(--itadaki-shadow-card);
@@ -422,11 +421,13 @@
 
 /* The photo and text open the dish; the button below adds it. A button cannot
    nest inside a link, so the card is a container rather than one anchor. */
+/* La fila: foto a la izquierda, texto al lado. `minmax(0, 1fr)` es lo que
+   deja al nombre cortarse en vez de empujar la fila fuera de la pantalla. */
 .card-link {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.8rem;
   text-decoration: none;
   color: inherit;
   min-width: 0;
@@ -458,13 +459,19 @@
 }
 
 .placeholder {
-  aspect-ratio: 16 / 9;
+  /* Mismo tamaño que la foto: si no, las filas con y sin imagen quedan de
+     alturas distintas y la lista se ve despareja. */
+  width: 76px;
+  height: 76px;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  border-radius: calc(var(--itadaki-radius-card) - 0.35rem);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--itadaki-font-display);
   font-weight: 700;
-  font-size: 2rem;
+  font-size: 1.35rem;
   color: oklch(38% 0.06 33);
   background: repeating-linear-gradient(
     135deg,
@@ -496,13 +503,19 @@
   min-width: 0;
 }
 
+/* Dos líneas como máximo: un nombre largo estiraba la fila y desalineaba la
+   foto respecto del texto, que es lo que hacía ver la lista despareja. */
 .card-name {
   font-family: var(--itadaki-font-display);
   font-weight: 600;
-  font-size: 1.02rem;
+  font-size: 1rem;
   color: var(--itadaki-ink-strong);
-  line-height: 1.3;
+  line-height: 1.25;
   letter-spacing: -0.2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .card-desc {
@@ -608,16 +621,14 @@
 }
 
 /*
- * Compacto y a la derecha de la fila.
+ * La acción principal de la tarjeta.
  *
- * A todo el ancho sumaba una línea entera por plato: con veinte platos eran
- * veinte líneas sólo de botones. Sigue siendo tocable con el pulgar — 44px
- * de alto, que es el mínimo cómodo.
+ * Comparte fila con la indicación para la cocina, que pesa menos: la mayoría
+ * pide el plato tal cual, y dos botones iguales obligan a elegir dos veces.
  */
 .card-add {
   display: grid;
   place-items: center;
-  align-self: center;
   border: none;
   border-radius: var(--itadaki-radius-pill);
   background: var(--itadaki-ink);
@@ -656,35 +667,43 @@
 /* Agregar manda y ocupa el ancho que le sobra; la indicación va al lado y se
    nota que es otra cosa. Dos botones iguales lado a lado obligan a leer los
    dos antes de tocar, y el noventa por ciento de los platos van tal cual. */
+/* Los dos botones, debajo de la fila y a todo el ancho de la tarjeta.
+   El margen lateral venía del diseño con foto grande, donde el botón tenía
+   que separarse del borde; acá la tarjeta ya tiene su padding. */
 .card-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
   align-items: stretch;
-  gap: 0.5rem;
-  margin: 0 1.05rem 1.05rem;
+  gap: 0.45rem;
+  margin: 0;
 }
 
 .card-actions .card-add {
-  flex: 1 1 auto;
   width: auto;
   margin: 0;
 }
 
 .card-note-btn {
   flex: 0 1 auto;
-  max-width: 48%;
   border: 1.5px dashed var(--itadaki-border);
   border-radius: var(--itadaki-radius-pill);
   background: transparent;
-  padding: 0.65rem 0.85rem;
+  padding: 0.6rem 0.9rem;
   font-family: inherit;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--itadaki-ink-subtle);
   cursor: pointer;
-  min-height: 42px;
+  min-height: 44px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.15s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.card-note-btn:active {
+  transform: scale(0.96);
 }
 
 /* Abierto se vuelve sólido: es el que está mandando en la tarjeta. */
@@ -694,11 +713,13 @@
   color: var(--itadaki-accent);
 }
 
+/* Dentro del padding de la tarjeta, como el resto: los márgenes laterales
+   venían de cuando el contenido no tenía uno propio. */
 .note-box {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin: -0.35rem 1.05rem 1.05rem;
+  margin: 0;
 }
 
 .note-input {
@@ -744,5 +765,48 @@
 
   .card-note-btn {
     max-width: none;
+  }
+}
+
+/* ---- Detalle ---- */
+
+/*
+ * La caja de indicación se despliega en vez de aparecer.
+ *
+ * Apareciendo de golpe empujaba las tarjetas de abajo y el ojo perdía el
+ * lugar; creciendo, se entiende que salió de la tarjeta que se tocó.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .note-box {
+    animation: note-in 0.2s cubic-bezier(0.2, 0, 0.2, 1) both;
+  }
+}
+
+@keyframes note-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* En pantalla ancha la foto crece un poco: hay lugar, y el plato se
+   reconoce mejor sin que la fila deje de ser una fila. */
+@media (min-width: 760px) {
+  .photo,
+  .placeholder {
+    width: 88px;
+    height: 88px;
+  }
+}
+
+/* Tocar la fila la levanta apenas: dice que es tocable sin un borde extra. */
+@media (hover: hover) {
+  .card:hover {
+    box-shadow: var(--itadaki-shadow-card-hover, var(--itadaki-shadow-card));
+    transform: translateY(-1px);
   }
 }

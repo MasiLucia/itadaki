@@ -199,9 +199,9 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
             </button>
 
             <!-- Secundario a propósito: la mayoría pide el plato tal cual, y
-                 dos botones con el mismo peso obligan a elegir dos veces. Dice
-                 "Sin sal, sin cebolla…" y no "Agregar comentario" porque el
-                 ejemplo se entiende sin leer: es lo que el mozo escucharía. -->
+                 dos botones con el mismo peso obligan a elegir dos veces.
+                 Corto porque al lado de "Agregar" no hay ancho para una
+                 frase: cortada a "Sin sal, sin …" se leía como un error. -->
             <button
               type="button"
               class="card-note-btn"
@@ -209,7 +209,7 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
               [attr.aria-expanded]="noting() === product.id"
               (click)="toggleNote(product.id)"
             >
-              Sin sal, sin cebolla…
+              + indicación
             </button>
           </div>
 
