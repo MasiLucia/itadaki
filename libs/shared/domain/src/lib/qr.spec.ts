@@ -36,11 +36,17 @@ function decode(matrix: QrMatrix): string {
     reserve(6, i);
     reserve(i, 6);
   }
+  // Nueve módulos junto al localizador de arriba a la izquierda, ocho junto a
+  // los otros dos. El decodificador cuenta los suyos, no los del codificador:
+  // copiarle la cuenta es lo que dejó pasar un desfase de un módulo que ningún
+  // lector real perdonaba.
   for (let i = 0; i < 9; i += 1) {
     reserve(8, i);
-    reserve(8, size - 1 - i);
     reserve(i, 8);
-    reserve(size - 1 - i, 8);
+    if (i < 8) {
+      reserve(8, size - 1 - i);
+      reserve(size - 1 - i, 8);
+    }
   }
 
   const alignment: Record<number, readonly number[]> = {
@@ -67,11 +73,15 @@ function decode(matrix: QrMatrix): string {
   }
 
   // The mask lives in the format field, which is itself masked by 0x5412.
+  //
+  // Se lee la copia de arriba a la izquierda entera —incluido el bit 8, que va
+  // en la columna 7— porque es la que mira primero cualquier lector. Leer la
+  // otra copia en su lugar deja pasar una copia rota.
   const formatBits: number[] = [];
   for (let i = 0; i < 15; i += 1) {
     if (i < 6) formatBits.push(modules[i]?.[8] === true ? 1 : 0);
     else if (i < 8) formatBits.push(modules[i + 1]?.[8] === true ? 1 : 0);
-    else formatBits.push(modules[size - 15 + i]?.[8] === true ? 1 : 0);
+    else formatBits.push(modules[8]?.[i === 8 ? 7 : 14 - i] === true ? 1 : 0);
   }
   let format = 0;
   for (let i = 14; i >= 0; i -= 1) format = (format << 1) | (formatBits[i] ?? 0);
@@ -196,6 +206,18 @@ describe('QR encoding', () => {
       expect(modules[r]?.[c]).toBe(true);
       expect(modules[r + 1]?.[c + 1]).toBe(false);
       expect(modules[r + 3]?.[c + 3]).toBe(true);
+    }
+  });
+
+  /**
+   * Es por donde la cámara cuenta cuántos módulos tiene el código. Un solo
+   * módulo pisado —lo hacía la información de formato— y la cuenta sale mal.
+   */
+  it('leaves the timing patterns alternating', () => {
+    const { modules, size } = matrixOf('https://itadaki.ar/unirse?i=AbCdEfGhIjKlMnOpQrStUw&r=itadaki');
+    for (let i = 8; i < size - 8; i += 1) {
+      expect(modules[6]?.[i]).toBe(i % 2 === 0);
+      expect(modules[i]?.[6]).toBe(i % 2 === 0);
     }
   });
 

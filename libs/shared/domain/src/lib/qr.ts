@@ -309,16 +309,19 @@ export function encodeQr(text: string): QrMatrix | QrError {
   }
 
   // Reserve format areas and the dark module.
+  // La copia de arriba a la izquierda ocupa nueve módulos por lado; las otras
+  // dos, ocho. Reservar uno de más corre todo lo que se escribe después: los
+  // datos quedan desfasados un módulo y ningún lector saca nada.
   for (let i = 0; i < 9; i += 1) {
     const r8 = reserved[8];
-    if (r8 !== undefined) {
-      r8[i] = true;
-      r8[size - 1 - i] = true;
-    }
+    if (r8 !== undefined) r8[i] = true;
     const ri = reserved[i];
     if (ri !== undefined) ri[8] = true;
-    const rn = reserved[size - 1 - i];
-    if (rn !== undefined) rn[8] = true;
+    if (i < 8) {
+      if (r8 !== undefined) r8[size - 1 - i] = true;
+      const rn = reserved[size - 1 - i];
+      if (rn !== undefined) rn[8] = true;
+    }
   }
   const darkRow = modules[size - 8];
   if (darkRow !== undefined) darkRow[8] = true;
@@ -403,8 +406,11 @@ export function encodeQr(text: string): QrMatrix | QrError {
         const row = candidate[8];
         if (row !== undefined) row[size - 1 - i] = bit;
       } else {
+        // El bit 8 va en la columna 7. En la 6 está el patrón de sincronismo,
+        // que es por donde el lector cuenta los módulos: pisarlo lo deja
+        // midiendo mal una fila entera.
         const row = candidate[8];
-        if (row !== undefined) row[14 - i] = bit;
+        if (row !== undefined) row[i === 8 ? 7 : 14 - i] = bit;
       }
     }
 
