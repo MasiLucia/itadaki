@@ -6,6 +6,21 @@ import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
 import { QrSheetComponent } from './qr-sheet.component';
 import { MetricsComponent } from './metrics.component';
 
+/**
+ * Las tres cosas distintas que hace un dueño acá.
+ *
+ * Estaban las tres en la misma página, una debajo de otra: la carta entera,
+ * el editor de fotos, el equipo, las mesas. Había que scrollear todo para
+ * llegar a cualquier cosa, y nada indicaba dónde ir para cada tarea.
+ */
+type AdminTab = 'carta' | 'fotos' | 'local';
+
+const TABS: ReadonlyArray<{ id: AdminTab; label: string; hint: string }> = [
+  { id: 'carta', label: 'Tu carta', hint: 'platos y categorías' },
+  { id: 'fotos', label: 'Fotos', hint: 'encuadrar y publicar' },
+  { id: 'local', label: 'Tu local', hint: 'mesas, equipo y ventas' },
+];
+
 const API = apiUrl();
 
 interface MenuProduct {
@@ -62,8 +77,8 @@ const ROLE_NAMES: Record<string, string> = {
     } @else {
     <header class="head">
       <div>
-        <p class="eyebrow">Administración · carta</p>
-        <h1 class="title">Fotos de los platos</h1>
+        <p class="eyebrow">Administración</p>
+        <h1 class="title">{{ tabTitle() }}</h1>
       </div>
       <div class="session">
         <span class="who">
@@ -73,6 +88,27 @@ const ROLE_NAMES: Record<string, string> = {
         <button type="button" class="signout" (click)="auth.signOut()">Salir</button>
       </div>
     </header>
+
+    <!-- Tres solapas en vez de una columna infinita.
+         Antes la carta entera, el equipo, las mesas y el editor de fotos
+         vivían apilados en la misma página: había que scrollear todo para
+         llegar a cualquier cosa, y no se veía dónde ir para cada tarea. -->
+    <nav class="tabs" aria-label="Secciones">
+      @for (tab of tabs; track tab.id) {
+        @if (canSee(tab.id)) {
+          <button
+            type="button"
+            class="tab"
+            [class.on]="activeTab() === tab.id"
+            [attr.aria-current]="activeTab() === tab.id ? 'page' : null"
+            (click)="activeTab.set(tab.id)"
+          >
+            <span class="tab-name">{{ tab.label }}</span>
+            <span class="tab-hint">{{ tab.hint }}</span>
+          </button>
+        }
+      }
+    </nav>
 
     @if (trial(); as sub) {
       @if (sub.status === 'EXPIRED') {
@@ -117,15 +153,12 @@ const ROLE_NAMES: Record<string, string> = {
       </section>
     }
 
-    @if (auth.can('metrics:read')) {
-      <div class="metrics-slot">
-        <itd-metrics [apiUrl]="apiUrl" />
-      </div>
-    }
+    <div class="layout" [attr.data-tab]="activeTab()">
 
-    <div class="layout">
+      <!-- Tu carta: los platos y cómo se organizan. -->
+      @if (activeTab() === 'carta') {
       <section class="panel">
-        <h2 class="panel-title">1 · elegí el plato</h2>
+        <h2 class="panel-title">Tus platos</h2>
         <div class="products">
           @for (product of products(); track product.id) {
             <button
@@ -149,9 +182,6 @@ const ROLE_NAMES: Record<string, string> = {
                   @if (!product.available) {
                     <span class="badge out">sin stock</span>
                   }
-                  @if (product.imageSet) {
-                    <span class="badge has-photo">con foto</span>
-                  }
                 </span>
               </span>
             </button>
@@ -160,6 +190,170 @@ const ROLE_NAMES: Record<string, string> = {
           }
         </div>
 
+        <details class="details manage-cats">
+          <summary>organizar categorías</summary>
+
+          <div class="cat-list">
+            @for (category of categories(); track category.id) {
+              <div class="cat-row">
+                <input
+                  class="cat-name"
+                  [value]="category.name"
+                  maxlength="40"
+                  [attr.aria-label]="'Nombre de ' + category.name"
+                  (blur)="renameCategory(category.id, $event)"
+                />
+                <span class="cat-count">{{ countIn(category.id) }}</span>
+                <button
+                  type="button"
+                  class="cat-move"
+                  [disabled]="$first"
+                  aria-label="Subir"
+                  (click)="moveCategory(category.id, -1)"
+                >↑</button>
+                <button
+                  type="button"
+                  class="cat-move"
+                  [disabled]="$last"
+                  aria-label="Bajar"
+                  (click)="moveCategory(category.id, 1)"
+                >↓</button>
+                <button
+                  type="button"
+                  class="cat-del"
+                  [disabled]="countIn(category.id) > 0"
+                  [attr.title]="countIn(category.id) > 0 ? 'primero movés sus platos' : 'eliminar'"
+                  aria-label="Eliminar categoría"
+                  (click)="deleteCategory(category.id)"
+                >×</button>
+              </div>
+            }
+          </div>
+
+          <form class="new-form" (submit)="createCategory($event)">
+            <label class="field">
+              <span>nueva categoría</span>
+              <input name="name" required maxlength="40" placeholder="ej: parrilla, entradas, vinos" />
+            </label>
+            <button type="submit" class="create">crear categoría</button>
+          </form>
+
+          @if (catError(); as error) {
+            <p class="status error">{{ error }}</p>
+          }
+        </details>
+
+        <details class="details new-dish">
+          <summary>+ agregar un plato nuevo</summary>
+          <form class="new-form" (submit)="createProduct($event)">
+            <label class="field">
+              <span>nombre</span>
+              <input name="name" required maxlength="60" placeholder="ej: gyoza de cerdo" />
+            </label>
+            <label class="field">
+              <span>descripción</span>
+              <input name="description" maxlength="140" placeholder="ej: seis unidades, salsa ponzu" />
+            </label>
+            <label class="field">
+              <span>precio en pesos</span>
+              <!-- step=1: a price is whatever the restaurant charges, not a
+                   multiple of a hundred. -->
+              <input name="price" type="number" min="0" step="1" required placeholder="4500" />
+            </label>
+            <label class="field">
+              <span>categoría</span>
+              <select name="categoryId">
+                @for (category of categories(); track category.id) {
+                  <option [value]="category.id">{{ category.name }}</option>
+                }
+              </select>
+            </label>
+            <button type="submit" class="create">crear plato</button>
+            @if (createError(); as error) {
+              <p class="status error">{{ error }}</p>
+            }
+            @if (createdName(); as name) {
+              <p class="status created" role="status">
+                {{ name }} ya está en tu carta ✓ — subile una foto acá al lado
+              </p>
+            }
+          </form>
+        </details>
+      </section>
+      }
+
+      <!-- Fotos: en su propia solapa, para que el editor no empuje la carta. -->
+      @if (activeTab() === 'fotos') {
+      <section class="panel">
+        <h2 class="panel-title">Encuadrá y ajustá el foco</h2>
+        @if (selected() === null) {
+          <!-- Sin plato elegido esta solapa no tiene nada que hacer, así que
+               manda de vuelta a donde se elige en vez de dejar un cartel. -->
+          <p class="muted">Elegí un plato de tu carta para subirle una foto.</p>
+          <button type="button" class="secondary" (click)="activeTab.set('carta')">
+            Ver mi carta →
+          </button>
+        } @else {
+          <div class="editing-bar">
+            <p class="editing-for">
+              editando <strong>{{ selectedName() }}</strong>
+            </p>
+            <label class="cat-picker">
+              <span>categoría</span>
+              <select [value]="selectedCategory()" (change)="moveProduct($event)">
+                @for (category of categories(); track category.id) {
+                  <option [value]="category.id">{{ category.name }}</option>
+                }
+              </select>
+            </label>
+
+            <!-- Prices change constantly; editing one should not mean deleting
+                 the dish and creating it again. -->
+            <label class="price-picker">
+              <span>precio</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                [value]="selectedPricePesos()"
+                (change)="changePrice($event)"
+              />
+              @if (priceSaved()) {
+                <span class="price-saved" role="status">guardado</span>
+              }
+            </label>
+          </div>
+          <itd-image-editor
+            [subjectId]="selected()!"
+            [existingUrl]="currentPhoto()"
+            (applied)="upload($event)"
+          />
+        }
+      </section>
+      <section class="panel">
+        <h2 class="panel-title">Así se va a ver</h2>
+        @if (status(); as state) {
+          <p class="status" [class.error]="state.startsWith('error')">{{ state }}</p>
+        }
+        @if (result(); as set) {
+          <img class="preview" [src]="best(set)" alt="" width="300" height="300" />
+          <p class="muted">{{ set.variants.length }} variantes · AVIF, WebP y JPEG en 4 tamaños</p>
+          <details class="details">
+            <summary>ver URLs generadas</summary>
+            <ul>
+              @for (variant of set.variants; track variant.url) {
+                <li>{{ variant.width }}px · {{ variant.format }}</li>
+              }
+            </ul>
+          </details>
+        }
+      </section>
+      }
+
+      <!-- Tu local: mesas, equipo y ventas. -->
+      @if (activeTab() === 'local') {
+      <section class="panel">
+        <h2 class="panel-title">Mesas y equipo</h2>
         <details class="details manage-tables">
           <summary>Mesas y códigos QR</summary>
 
@@ -270,163 +464,34 @@ const ROLE_NAMES: Record<string, string> = {
           </details>
         }
 
-        <details class="details manage-cats">
-          <summary>organizar categorías</summary>
-
-          <div class="cat-list">
-            @for (category of categories(); track category.id) {
-              <div class="cat-row">
-                <input
-                  class="cat-name"
-                  [value]="category.name"
-                  maxlength="40"
-                  [attr.aria-label]="'Nombre de ' + category.name"
-                  (blur)="renameCategory(category.id, $event)"
-                />
-                <span class="cat-count">{{ countIn(category.id) }}</span>
-                <button
-                  type="button"
-                  class="cat-move"
-                  [disabled]="$first"
-                  aria-label="Subir"
-                  (click)="moveCategory(category.id, -1)"
-                >↑</button>
-                <button
-                  type="button"
-                  class="cat-move"
-                  [disabled]="$last"
-                  aria-label="Bajar"
-                  (click)="moveCategory(category.id, 1)"
-                >↓</button>
-                <button
-                  type="button"
-                  class="cat-del"
-                  [disabled]="countIn(category.id) > 0"
-                  [attr.title]="countIn(category.id) > 0 ? 'primero movés sus platos' : 'eliminar'"
-                  aria-label="Eliminar categoría"
-                  (click)="deleteCategory(category.id)"
-                >×</button>
-              </div>
-            }
-          </div>
-
-          <form class="new-form" (submit)="createCategory($event)">
-            <label class="field">
-              <span>nueva categoría</span>
-              <input name="name" required maxlength="40" placeholder="ej: parrilla, entradas, vinos" />
-            </label>
-            <button type="submit" class="create">crear categoría</button>
-          </form>
-
-          @if (catError(); as error) {
-            <p class="status error">{{ error }}</p>
-          }
-        </details>
-
-        <details class="details new-dish">
-          <summary>+ agregar un plato nuevo</summary>
-          <form class="new-form" (submit)="createProduct($event)">
-            <label class="field">
-              <span>nombre</span>
-              <input name="name" required maxlength="60" placeholder="ej: gyoza de cerdo" />
-            </label>
-            <label class="field">
-              <span>descripción</span>
-              <input name="description" maxlength="140" placeholder="ej: seis unidades, salsa ponzu" />
-            </label>
-            <label class="field">
-              <span>precio en pesos</span>
-              <!-- step=1: a price is whatever the restaurant charges, not a
-                   multiple of a hundred. -->
-              <input name="price" type="number" min="0" step="1" required placeholder="4500" />
-            </label>
-            <label class="field">
-              <span>categoría</span>
-              <select name="categoryId">
-                @for (category of categories(); track category.id) {
-                  <option [value]="category.id">{{ category.name }}</option>
-                }
-              </select>
-            </label>
-            <button type="submit" class="create">crear plato</button>
-            @if (createError(); as error) {
-              <p class="status error">{{ error }}</p>
-            }
-            @if (createdName(); as name) {
-              <p class="status created" role="status">
-                {{ name }} ya está en tu carta ✓ — subile una foto acá al lado
-              </p>
-            }
-          </form>
-        </details>
       </section>
 
-      <section class="panel">
-        <h2 class="panel-title">2 · encuadrá y ajustá el foco</h2>
-        @if (selected() === null) {
-          <p class="muted">elegí un plato de la izquierda para subirle una foto.</p>
-        } @else {
-          <div class="editing-bar">
-            <p class="editing-for">
-              editando <strong>{{ selectedName() }}</strong>
-            </p>
-            <label class="cat-picker">
-              <span>categoría</span>
-              <select [value]="selectedCategory()" (change)="moveProduct($event)">
-                @for (category of categories(); track category.id) {
-                  <option [value]="category.id">{{ category.name }}</option>
-                }
-              </select>
-            </label>
-
-            <!-- Prices change constantly; editing one should not mean deleting
-                 the dish and creating it again. -->
-            <label class="price-picker">
-              <span>precio</span>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                [value]="selectedPricePesos()"
-                (change)="changePrice($event)"
-              />
-              @if (priceSaved()) {
-                <span class="price-saved" role="status">guardado</span>
-              }
-            </label>
-          </div>
-          <itd-image-editor
-            [subjectId]="selected()!"
-            [existingUrl]="currentPhoto()"
-            (applied)="upload($event)"
-          />
-        }
-      </section>
-
-      <section class="panel">
-        <h2 class="panel-title">3 · resultado</h2>
-        @if (status(); as state) {
-          <p class="status" [class.error]="state.startsWith('error')">{{ state }}</p>
-        }
-        @if (result(); as set) {
-          <img class="preview" [src]="best(set)" alt="" width="300" height="300" />
-          <p class="muted">{{ set.variants.length }} variantes · AVIF, WebP y JPEG en 4 tamaños</p>
-          <details class="details">
-            <summary>ver URLs generadas</summary>
-            <ul>
-              @for (variant of set.variants; track variant.url) {
-                <li>{{ variant.width }}px · {{ variant.format }}</li>
-              }
-            </ul>
-          </details>
-        }
-      </section>
+      @if (auth.can('metrics:read')) {
+        <section class="panel">
+          <h2 class="panel-title">Ventas</h2>
+          <itd-metrics [apiUrl]="apiUrl" />
+        </section>
+      }
+      }
     </div>
     }
   `,
 })
 export class AdminComponent {
   protected readonly auth = inject(AuthStore);
+
+  protected readonly tabs = TABS;
+  protected readonly activeTab = signal<AdminTab>('carta');
+
+  protected tabTitle(): string {
+    return TABS.find((tab) => tab.id === this.activeTab())?.label ?? 'Administración';
+  }
+
+  /** El equipo y las ventas sólo los ve quien tiene permiso. */
+  protected canSee(tab: AdminTab): boolean {
+    if (tab !== 'local') return true;
+    return this.auth.can('staff:manage') || this.auth.can('metrics:read');
+  }
 
   protected readonly products = signal<readonly MenuProduct[]>([]);
   protected readonly categories = signal<readonly MenuCategory[]>([]);
@@ -882,6 +947,10 @@ export class AdminComponent {
   protected select(id: string): void {
     this.selected.set(id);
     this.status.set(null);
+
+    // Elegir un plato es el paso previo a trabajar su foto, así que la solapa
+    // acompaña: sin esto había que elegir acá y después buscar dónde seguir.
+    this.activeTab.set('fotos');
 
     // Show the dish's current photo, if it has one, instead of whatever the
     // previous upload left on screen.
