@@ -1,5 +1,13 @@
 import { apiUrl } from '@itadaki/shared/domain';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  HostListener,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { type ImageEditParams } from '@itadaki/catalog/domain';
 import { ImageEditorComponent } from '@itadaki/shared/ui-image-editor';
 import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
@@ -160,65 +168,22 @@ const ROLE_NAMES: Record<string, string> = {
       <!-- Tu carta: los platos y cómo se organizan. -->
       @if (activeTab() === 'carta') {
       <section class="panel">
-        <h2 class="panel-title">Tus platos</h2>
+        @if (createdName(); as name) {
+          <!-- Sobre la carta, no dentro del modal que acaba de cerrarse:
+               acá se lee junto al plato que recién apareció. -->
+          <p class="status created" role="status">
+            <strong>{{ name }}</strong> ya está en tu carta ✓
+          </p>
+        }
+
+        <div class="panel-head">
+          <h2 class="panel-title">Tus platos</h2>
+          <!-- Crear abre su propia pantalla: pegado a la lista hacía
+               dudar si el formulario editaba un plato o creaba otro. -->
+          <button type="button" class="create" (click)="openNew()">+ plato nuevo</button>
+        </div>
 
 
-        <!-- Abierto, no plegado.
-             Escondido detrás de un resumen, alguien lo llenaba, lo cerraba y
-             se quedaba sin saber si el plato se había guardado. -->
-        <details class="details new-dish" open>
-          <summary>+ agregar un plato nuevo</summary>
-          <form class="new-form" (submit)="createProduct($event)">
-            <label class="field">
-              <span>nombre</span>
-              <input name="name" required maxlength="60" placeholder="ej: gyoza de cerdo" />
-            </label>
-            <label class="field">
-              <span>descripción</span>
-              <input name="description" maxlength="140" placeholder="ej: seis unidades, salsa ponzu" />
-            </label>
-            <label class="field">
-              <span>precio en pesos</span>
-              <!-- step=1: a price is whatever the restaurant charges, not a
-                   multiple of a hundred. -->
-              <input name="price" type="number" min="0" step="1" required placeholder="4500" />
-            </label>
-            <label class="field">
-              <span>categoría</span>
-              <select name="categoryId">
-                @for (category of categories(); track category.id) {
-                  <option [value]="category.id">{{ category.name }}</option>
-                }
-              </select>
-            </label>
-            <!-- Las dietas se cargan al crear, no después: un plato que
-                 nace sin ellas es invisible para quien filtra la carta, y
-                 nadie vuelve a editarlo para agregarlas. -->
-            <fieldset class="field diets">
-              <legend>apto para</legend>
-              <div class="checks">
-                @for (diet of dietOptions; track diet.id) {
-                  <label class="check">
-                    <input type="checkbox" [name]="'diet-' + diet.id" />
-                    <span>{{ diet.label }}</span>
-                  </label>
-                }
-              </div>
-            </fieldset>
-
-            <button type="submit" class="create">crear plato</button>
-            @if (createError(); as error) {
-              <p class="status error">{{ error }}</p>
-            }
-            @if (createdName(); as name) {
-              <!-- El plato ya está guardado; la foto es opcional y va después.
-                   Decirlo acá evita que alguien crea que faltó algo. -->
-              <p class="status created" role="status">
-                <strong>{{ name }}</strong> ya está en tu carta ✓
-              </p>
-            }
-          </form>
-        </details>
 
         <div class="products">
           @for (product of products(); track product.id) {
@@ -251,86 +216,6 @@ const ROLE_NAMES: Record<string, string> = {
           }
         </div>
 
-        <!-- La ficha del plato elegido, acá mismo.
-             Tocar un plato saltaba al editor de fotos y decía "editando X"
-             sin que nadie lo hubiera pedido; la foto es una de las cosas que
-             se le pueden cambiar, no la primera. -->
-        @if (editing(); as dish) {
-          <div class="dish-sheet">
-            <header class="sheet-head">
-              <h3 class="sheet-name">{{ dish.name }}</h3>
-              <button type="button" class="sheet-close" (click)="closeSheet()">cerrar</button>
-            </header>
-
-            <form class="edit-form" (submit)="saveDish($event, dish)">
-              <div class="field-row">
-                <label class="field">
-                  <span>nombre</span>
-                  <input name="name" [value]="dish.name" required maxlength="60" />
-                </label>
-                <label class="field narrow">
-                  <span>precio</span>
-                  <input
-                    name="price"
-                    type="number"
-                    min="0"
-                    step="1"
-                    [value]="dish.price.amountInMinorUnits / 100"
-                    required
-                  />
-                </label>
-              </div>
-
-              <label class="field">
-                <span>descripción</span>
-                <input name="description" [value]="dish.description" maxlength="140" />
-              </label>
-
-              <label class="field">
-                <span>categoría</span>
-                <select name="categoryId">
-                  @for (category of categories(); track category.id) {
-                    <option [value]="category.id" [selected]="category.id === dish.categoryId">
-                      {{ category.name }}
-                    </option>
-                  }
-                </select>
-              </label>
-
-              <!-- Los filtros de la carta leen esto: un plato sin dietas es
-                   invisible para quien busca vegano o sin gluten. -->
-              <fieldset class="field diets">
-                <legend>apto para</legend>
-                <div class="checks">
-                  @for (diet of dietOptions; track diet.id) {
-                    <label class="check">
-                      <input
-                        type="checkbox"
-                        [name]="'diet-' + diet.id"
-                        [checked]="dish.diets.includes(diet.id)"
-                      />
-                      <span>{{ diet.label }}</span>
-                    </label>
-                  }
-                </div>
-              </fieldset>
-
-              @if (editError(); as error) {
-                <p class="status error">{{ error }}</p>
-              }
-              @if (editSaved()) {
-                <p class="status created" role="status">Guardado ✓</p>
-              }
-
-              <div class="sheet-actions">
-                <button type="submit" class="create">Guardar cambios</button>
-                <button type="button" class="secondary" (click)="activeTab.set('fotos')">
-                  Trabajar la foto →
-                </button>
-              </div>
-            </form>
-          </div>
-        }
 
         <details class="details manage-cats">
           <summary>organizar categorías</summary>
@@ -579,6 +464,152 @@ const ROLE_NAMES: Record<string, string> = {
       }
       }
     </div>
+
+    <!-- Los modales, al final del template para que queden por encima de
+         todo sin depender del orden de la página. -->
+    @if (modal() !== null) {
+      <div class="scrim" (click)="closeModal()" aria-hidden="true"></div>
+    }
+
+    @if (modal() === 'nuevo') {
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="nuevo-title">
+        <header class="modal-head">
+          <h2 class="modal-title" id="nuevo-title">Plato nuevo</h2>
+          <button type="button" class="modal-close" (click)="closeModal()" aria-label="Cerrar">
+            ✕
+          </button>
+        </header>
+        <div class="modal-body">
+
+                  <form class="new-form" (submit)="createProduct($event)">
+            <label class="field">
+              <span>nombre</span>
+              <input name="name" required maxlength="60" placeholder="ej: gyoza de cerdo" />
+            </label>
+            <label class="field">
+              <span>descripción</span>
+              <input name="description" maxlength="140" placeholder="ej: seis unidades, salsa ponzu" />
+            </label>
+            <label class="field">
+              <span>precio en pesos</span>
+              <!-- step=1: a price is whatever the restaurant charges, not a
+                   multiple of a hundred. -->
+              <input name="price" type="number" min="0" step="1" required placeholder="4500" />
+            </label>
+            <label class="field">
+              <span>categoría</span>
+              <select name="categoryId">
+                @for (category of categories(); track category.id) {
+                  <option [value]="category.id">{{ category.name }}</option>
+                }
+              </select>
+            </label>
+            <!-- Las dietas se cargan al crear, no después: un plato que
+                 nace sin ellas es invisible para quien filtra la carta, y
+                 nadie vuelve a editarlo para agregarlas. -->
+            <fieldset class="field diets">
+              <legend>apto para</legend>
+              <div class="checks">
+                @for (diet of dietOptions; track diet.id) {
+                  <label class="check">
+                    <input type="checkbox" [name]="'diet-' + diet.id" />
+                    <span>{{ diet.label }}</span>
+                  </label>
+                }
+              </div>
+            </fieldset>
+
+            <button type="submit" class="create">crear plato</button>
+            @if (createError(); as error) {
+              <p class="status error">{{ error }}</p>
+            }
+          </form>
+        </div>
+      </div>
+    }
+
+    @if (modal() === 'editar' && editing(); as dish) {
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editar-title">
+        <header class="modal-head">
+          <div>
+            <p class="modal-eyebrow">Editando</p>
+            <h2 class="modal-title" id="editar-title">{{ dish.name }}</h2>
+          </div>
+          <button type="button" class="modal-close" (click)="closeSheet()" aria-label="Cerrar">
+            ✕
+          </button>
+        </header>
+        <div class="modal-body">
+          <form class="edit-form" (submit)="saveDish($event, dish)">
+          <div class="field-row">
+          <label class="field">
+          <span>nombre</span>
+          <input name="name" [value]="dish.name" required maxlength="60" />
+          </label>
+          <label class="field narrow">
+          <span>precio</span>
+          <input
+          name="price"
+          type="number"
+          min="0"
+          step="1"
+          [value]="dish.price.amountInMinorUnits / 100"
+          required
+          />
+          </label>
+          </div>
+
+          <label class="field">
+          <span>descripción</span>
+          <input name="description" [value]="dish.description" maxlength="140" />
+          </label>
+
+          <label class="field">
+          <span>categoría</span>
+          <select name="categoryId">
+          @for (category of categories(); track category.id) {
+          <option [value]="category.id" [selected]="category.id === dish.categoryId">
+          {{ category.name }}
+          </option>
+          }
+          </select>
+          </label>
+
+          <!-- Los filtros de la carta leen esto: un plato sin dietas es
+          invisible para quien busca vegano o sin gluten. -->
+          <fieldset class="field diets">
+          <legend>apto para</legend>
+          <div class="checks">
+          @for (diet of dietOptions; track diet.id) {
+          <label class="check">
+          <input
+          type="checkbox"
+          [name]="'diet-' + diet.id"
+          [checked]="dish.diets.includes(diet.id)"
+          />
+          <span>{{ diet.label }}</span>
+          </label>
+          }
+          </div>
+          </fieldset>
+
+          @if (editError(); as error) {
+          <p class="status error">{{ error }}</p>
+          }
+          @if (editSaved()) {
+          <p class="status created" role="status">Guardado ✓</p>
+          }
+
+          <div class="sheet-actions">
+          <button type="submit" class="create">Guardar cambios</button>
+          <button type="button" class="secondary" (click)="activeTab.set('fotos')">
+          Trabajar la foto →
+          </button>
+          </div>
+          </form>
+        </div>
+      </div>
+    }
     }
   `,
 })
@@ -626,6 +657,34 @@ export class AdminComponent {
   protected readonly editError = signal<string | null>(null);
   protected readonly editSaved = signal(false);
 
+  /**
+   * Qué modal está abierto, si alguno.
+   *
+   * Crear y editar son tareas que empiezan y terminan: mientras están
+   * abiertas ocupan la pantalla y al cerrarlas la carta queda como estaba.
+   * En la misma página, el formulario de alta pegado a la lista hacía dudar
+   * si un plato se estaba creando o editando.
+   */
+  protected readonly modal = signal<'nuevo' | 'editar' | 'opciones' | null>(null);
+
+  protected openNew(): void {
+    this.createError.set(null);
+    this.createdName.set(null);
+    this.modal.set('nuevo');
+  }
+
+  protected closeModal(): void {
+    this.modal.set(null);
+    this.editError.set(null);
+    this.editSaved.set(false);
+  }
+
+  /** Cerrar con Escape: es lo que espera cualquiera con un modal abierto. */
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.modal() !== null) this.closeModal();
+  }
+
   /** Las dietas que la carta ofrece como filtro, con su nombre en español. */
   protected readonly dietOptions = [
     { id: 'VEGAN', label: 'vegano' },
@@ -636,8 +695,7 @@ export class AdminComponent {
 
   protected closeSheet(): void {
     this.selected.set(null);
-    this.editError.set(null);
-    this.editSaved.set(false);
+    this.closeModal();
   }
 
   /**
@@ -1114,8 +1172,10 @@ export class AdminComponent {
       this.select(created.id);
     }
 
-    // The dish lands at the top of a list the form has scrolled past, so
-    // without a word here it reads as if nothing happened.
+    // El modal se cierra y el aviso queda sobre la carta, donde el plato
+    // recién aparece: dejarlo abierto obligaba a cerrarlo a mano para
+    // comprobar que el plato estaba, que es lo único que interesa saber.
+    this.modal.set(null);
     this.createdName.set(created.name ?? 'El plato');
     globalThis.setTimeout(() => this.createdName.set(null), 4000);
   }
@@ -1123,6 +1183,9 @@ export class AdminComponent {
   protected select(id: string): void {
     this.selected.set(id);
     this.status.set(null);
+    this.editError.set(null);
+    this.editSaved.set(false);
+    this.modal.set('editar');
 
     // Sin saltar de solapa: tocar un plato abre su ficha para editarlo, y
     // saltar al editor de fotos decía "editando X" sin que nadie lo hubiera
