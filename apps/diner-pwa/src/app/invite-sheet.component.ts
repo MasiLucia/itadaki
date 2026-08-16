@@ -32,9 +32,13 @@ import { SessionStore } from './session.store';
 
         <!-- El blanco cubre también la zona de silencio: el rectángulo arranca
              en el borde del viewBox y no en el primer módulo. -->
+        <!-- crispEdges: sin esto el navegador suaviza el borde de cada módulo,
+             y con una matriz densa los límites entre blanco y negro quedan
+             lavados. El lector necesita justamente ese contraste. -->
         <svg
           class="qr"
           [attr.viewBox]="code.viewBox"
+          shape-rendering="crispEdges"
           role="img"
           aria-label="Código para unirse a la mesa"
         >
@@ -121,10 +125,12 @@ import { SessionStore } from './session.store';
 
        La zona de silencio va adentro del SVG, no como padding: así escala con
        el código en vez de quedarse corta justo cuando la matriz es más densa. */
+    /* Sin borde redondeado: el patrón de posición de arriba a la izquierda
+       arranca en la esquina, y recortarla es recortar lo primero que el lector
+       busca. */
     .qr {
       width: min(86vw, 320px);
       height: auto;
-      border-radius: 8px;
       background: white;
     }
 
