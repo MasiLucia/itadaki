@@ -55,6 +55,15 @@ import { SessionStore } from './session.store';
             Generar otro
           </button>
         }
+
+        <!-- Salida cuando escanear no funciona: cámara vieja, pantalla con
+             brillo bajo, o el otro teléfono sin lector. Se manda por mensaje y
+             listo. Mostrar el destino además sirve para ver de un vistazo si
+             la app está apuntando a donde debe. -->
+        <button type="button" class="again" (click)="copy()">
+          {{ copied() ? 'Link copiado ✓' : 'Copiar link' }}
+        </button>
+        <p class="target">{{ host() }}</p>
       } @else if (busy()) {
         <p class="title">Generando…</p>
       } @else {
@@ -98,13 +107,25 @@ import { SessionStore } from './session.store';
       text-align: center;
     }
 
-    /* Grande: se escanea desde otro teléfono, a un brazo de distancia. */
+    /* Lo más grande que entre: el link lleva el token de la mesa entero, así
+       que la matriz es de 61 módulos y a 240px cada uno quedaba en 3,9px —
+       al límite de lo que una cámara enfoca de cerca. Acá cada módulo pasa de
+       5px, y el borde blanco es la zona de silencio que el lector necesita
+       para encontrar el código. */
     .qr {
-      width: min(62vw, 240px);
+      width: min(86vw, 320px);
       height: auto;
       border-radius: 8px;
       background: white;
-      padding: 8px;
+      padding: 12px;
+    }
+
+    .target {
+      margin: 0;
+      font-size: 0.7rem;
+      color: var(--itadaki-ink-faint);
+      word-break: break-all;
+      text-align: center;
     }
 
     .expiry {
@@ -180,6 +201,32 @@ export class InviteSheetComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     clearInterval(this.timer);
+  }
+
+  protected readonly copied = signal(false);
+
+  /** Sólo el dominio: el link entero es ilegible y no aporta nada mirarlo. */
+  protected readonly host = computed(() => {
+    const current = this.invite();
+    if (current === null) return '';
+    try {
+      return new URL(current.url).host;
+    } catch {
+      return current.url.slice(0, 40);
+    }
+  });
+
+  protected async copy(): Promise<void> {
+    const current = this.invite();
+    if (current === null) return;
+
+    try {
+      await navigator.clipboard.writeText(current.url);
+      this.copied.set(true);
+      setTimeout(() => this.copied.set(false), 2000);
+    } catch {
+      // Portapapeles negado o sin permiso. El QR sigue estando.
+    }
   }
 
   protected async generate(): Promise<void> {
