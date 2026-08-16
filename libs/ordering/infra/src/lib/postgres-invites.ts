@@ -15,12 +15,16 @@ export type InviteError =
 /**
  * Cuánto vive una invitación.
  *
- * Corto a propósito: el invitado ya está parado al lado de la mesa mirando la
- * pantalla, no le hace falta más. Y es la ventana entera que tiene alguien que
- * la fotografíe de reojo desde otra mesa — con dos minutos, para cuando
- * termina de intentarlo la invitación ya no existe.
+ * Sirve para toda la gente que llegue mientras esté vigente, no para una sola
+ * persona: en un cumpleaños entra uno primero y van cayendo veinte, y un QR
+ * por invitado es inusable. Quien la muestra la tiene en la mano y la ve
+ * vencer, así que puede generar otra cuando haga falta.
+ *
+ * Quince minutos cubre a un grupo que va llegando de a poco sin dejar la
+ * puerta abierta toda la cena. Lo que la limita de verdad no es el reloj sino
+ * el techo de la mesa: cuando se llena, no entra nadie más.
  */
-export const INVITE_MINUTES = 2;
+export const INVITE_MINUTES = 15;
 
 /**
  * El código de la invitación.
@@ -61,15 +65,18 @@ export class PostgresInviteStore {
   }
 
   /**
-   * Canjea una invitación, si sigue sirviendo.
+   * Canjea una invitación, si sigue vigente.
    *
-   * Todo en un solo UPDATE: comprobar y marcar usada en dos pasos deja una
-   * ventana en la que dos teléfonos que escanean el mismo QR a la vez entran
-   * los dos, que es justo lo que la invitación tiene que impedir. Acá el
-   * segundo no matchea ninguna fila y se va con las manos vacías.
+   * Vale para todos los que lleguen dentro de su ventana, no para uno solo:
+   * quien la muestra levanta el teléfono una vez y se suma la mesa entera.
+   * `used_at` guarda la última vez que se usó — sirve para reconstruir cómo
+   * entró cada uno si alguna vez hay que revisar una mesa, y no decide nada.
    *
-   * Devolver siempre el mismo error para vencida, usada e inexistente es
-   * deliberado: quien prueba códigos no aprende cuáles existieron.
+   * Lo único que la corta es el vencimiento. Y detrás está el techo de la
+   * mesa: con veinte sentados, la invitación deja de servirle a nadie.
+   *
+   * Devolver el mismo error para vencida e inexistente es deliberado: quien
+   * prueba códigos no aprende cuáles existieron.
    */
   async redeem(
     tenantId: string,
@@ -83,7 +90,6 @@ export class PostgresInviteStore {
               SET used_at = $3
             WHERE code = $2
               AND tenant_id = $1
-              AND used_at IS NULL
               AND expires_at > $3
         RETURNING session_id`,
           [tenantId, code, now],

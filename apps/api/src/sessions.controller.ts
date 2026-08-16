@@ -58,8 +58,8 @@ const joinSchema = z.object({
   /**
    * Invitación de quien ya está sentado, escaneada de su teléfono.
    *
-   * Reemplaza al código: vale una vez y vence en minutos, así que el que llega
-   * tarde entra sin que nadie tenga que mostrar el PIN en pantalla.
+   * Reemplaza al código: vence en minutos, así que los que llegan tarde entran
+   * sin que nadie tenga que mostrar el PIN en pantalla.
    */
   invite: z.string().min(1).max(64).optional(),
 });
@@ -298,9 +298,9 @@ export class SessionsController {
     const seated = await this.tables.find(table.tenantId, table.tableId);
     const tableCode = seated.isOk() ? (seated.value.joinCode ?? undefined) : undefined;
 
-    // Una invitación válida reemplaza al código: la emitió alguien que ya está
-    // en la mesa, vale una vez y vence en minutos. Se canjea acá —marcándola
-    // usada— así dos teléfonos que escanean el mismo QR no entran los dos.
+    // Una invitación vigente reemplaza al código: la emitió alguien que ya
+    // está en la mesa y vence en minutos. Sirve para todo el grupo que va
+    // llegando, así que no se consume al usarla.
     let expectedCode = tableCode;
     if (parsed.data.invite !== undefined) {
       const redeemed = await this.invites.redeem(
@@ -362,8 +362,9 @@ export class SessionsController {
    * Una invitación para el que llegó tarde.
    *
    * La pide alguien que ya está sentado, desde su teléfono, y sale como QR
-   * para que el invitado lo escanee. Vale una sola vez y vence en dos minutos:
-   * quien la fotografíe desde otra mesa se lleva algo que ya no sirve.
+   * para que los invitados lo escaneen. El mismo sirve para todo el grupo que
+   * llegue mientras esté vigente, y vence en minutos: no queda una puerta
+   * abierta al resto del salón por el resto de la cena.
    *
    * Sólo la emite quien está en la mesa. El token del QR no alcanza —es
    * justamente lo que puede estar filtrado— así que además hay que ser uno de

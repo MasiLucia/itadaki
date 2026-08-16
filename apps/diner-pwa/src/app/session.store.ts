@@ -113,10 +113,10 @@ export class SessionStore {
   }
 
   /**
-   * Pide una invitación para sumar a alguien que llegó tarde.
+   * Pide una invitación para sumar a los que llegan tarde.
    *
-   * Vale una vez y vence en dos minutos, así que se pide en el momento y no se
-   * guarda: el QR se dibuja, se escanea y se muere.
+   * Vence en minutos, así que se pide en el momento y no se guarda: el QR se
+   * dibuja, lo escanean los que llegaron, y se muere solo.
    */
   async invite(): Promise<{ url: string; expiresAt: number } | null> {
     const sessionId = this.session()?.id;
@@ -202,8 +202,8 @@ export class SessionStore {
       const detail = (await response.json().catch(() => null)) as { kind?: string } | null;
 
       if (detail?.kind === 'INVITE_INVALID') {
-        // Vencida, ya usada por otro, o de otra mesa. Se dice sin distinguir
-        // cuál de las tres: el que llegó tarde sólo necesita pedir otra.
+        // Vencida, o de otra mesa. Se dice sin distinguir cuál de las dos: el
+        // que llegó tarde sólo necesita pedir otra.
         this.table.invite.set(null);
         this.joinError.set('Esa invitación ya no sirve — pedile otra a tu mesa');
         return false;

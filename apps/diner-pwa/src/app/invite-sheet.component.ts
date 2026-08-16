@@ -10,13 +10,15 @@ import {
 import { SessionStore } from './session.store';
 
 /**
- * Sumar a alguien que llegó tarde, sin decir el PIN en voz alta.
+ * Sumar a los que llegan tarde, sin decir el PIN en voz alta.
  *
  * El PIN lo da el mozo al sentar la mesa y no vuelve a aparecer en ningún
  * teléfono: mostrarlo para que un amigo lo copie es mostrárselo también a
- * quien mire desde la mesa de al lado. Esto es un QR de un solo uso que vence
- * en dos minutos — fotografiarlo de reojo no sirve, porque para cuando el que
- * lo robó lo intenta, el invitado ya lo usó o ya venció.
+ * quien mire desde la mesa de al lado.
+ *
+ * El mismo QR sirve para todos los que lleguen mientras esté vigente. Un
+ * código por invitado sonaba más seguro, pero en un cumpleaños de veinte
+ * obligaba a generar diecinueve, y una función que nadie usa no protege nada.
  */
 @Component({
   selector: 'itd-invite-sheet',
@@ -26,7 +28,7 @@ import { SessionStore } from './session.store';
     <div class="backdrop" (click)="close()"></div>
     <div class="sheet" role="dialog" aria-label="Invitar a alguien a la mesa">
       @if (qr(); as code) {
-        <p class="title">Que lo escanee desde su teléfono</p>
+        <p class="title">Que lo escaneen desde sus teléfonos</p>
 
         <svg
           class="qr"
@@ -40,11 +42,11 @@ import { SessionStore } from './session.store';
 
         <!-- El contador no es decoración: sin él, el que escanea tarde ve un
              error sin entender por qué, y vuelve a pedir otro. -->
-        <p class="expiry" [class.soon]="secondsLeft() <= 30" aria-live="polite">
+        <p class="expiry" [class.soon]="secondsLeft() <= 60" aria-live="polite">
           @if (secondsLeft() > 0) {
-            Vence en {{ clock() }} · sirve una sola vez
+            Vence en {{ clock() }} · lo pueden escanear todos
           } @else {
-            Venció. Pedí uno nuevo.
+            Venció. Generá otro para seguir sumando gente.
           }
         </p>
 

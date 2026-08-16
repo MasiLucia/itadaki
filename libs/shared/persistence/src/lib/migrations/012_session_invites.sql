@@ -3,12 +3,12 @@
 -- El PIN lo da el mozo al sentar la mesa. Para el que llega tarde, obligar a
 -- que alguien le dicte el PIN significa mostrarlo en pantalla, y ahí cualquiera
 -- de la mesa de al lado lo lee. La invitación evita eso: la genera quien ya
--- está sentado, vale una sola vez y vence en minutos, así que fotografiarla
--- de reojo no sirve de nada.
+-- está sentado y vence en minutos, así que sirve para el grupo que está
+-- llegando y no para siempre.
 --
 -- Tabla propia y no una columna en la sesión: son varias por mesa, con su
--- propio ciclo de vida, y el "un solo uso" tiene que ser una escritura atómica
--- que no compita con las del carrito compartido.
+-- propio ciclo de vida, y sus escrituras no tienen por qué competir con las
+-- del carrito compartido, que van con lock de fila.
 CREATE TABLE IF NOT EXISTS session_invites (
   tenant_id   text        NOT NULL,
   code        text        NOT NULL,
@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS session_invites (
   invited_by  text        NOT NULL,
   created_at  timestamptz NOT NULL DEFAULT now(),
   expires_at  timestamptz NOT NULL,
-  -- Null mientras nadie la usó. Es lo que hace el "un solo uso".
+  -- La última vez que alguien entró con ella. No decide nada: sirve para
+  -- reconstruir cómo entró cada uno si hay que revisar qué pasó en una mesa.
   used_at     timestamptz,
   PRIMARY KEY (tenant_id, code)
 );
