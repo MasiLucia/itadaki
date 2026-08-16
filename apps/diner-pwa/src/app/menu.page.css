@@ -483,3 +483,97 @@
   color: var(--itadaki-ink-muted);
   line-height: 1.6;
 }
+
+/* Agregar manda y ocupa el ancho que le sobra; la indicación va al lado y se
+   nota que es otra cosa. Dos botones iguales lado a lado obligan a leer los
+   dos antes de tocar, y el noventa por ciento de los platos van tal cual. */
+.card-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin: 0 1.05rem 1.05rem;
+}
+
+.card-actions .card-add {
+  flex: 1 1 auto;
+  width: auto;
+  margin: 0;
+}
+
+.card-note-btn {
+  flex: 0 1 auto;
+  max-width: 48%;
+  border: 1.5px dashed var(--itadaki-border);
+  border-radius: var(--itadaki-radius-pill);
+  background: transparent;
+  padding: 0.65rem 0.85rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-subtle);
+  cursor: pointer;
+  min-height: 42px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Abierto se vuelve sólido: es el que está mandando en la tarjeta. */
+.card-note-btn.open {
+  border-style: solid;
+  border-color: var(--itadaki-accent);
+  color: var(--itadaki-accent);
+}
+
+.note-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: -0.35rem 1.05rem 1.05rem;
+}
+
+.note-input {
+  width: 100%;
+  border: 1.5px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-chip);
+  background: var(--itadaki-surface);
+  padding: 0.65rem 0.8rem;
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: var(--itadaki-ink-strong);
+  min-height: 44px;
+}
+
+.note-input:focus-visible {
+  outline: 2px solid var(--itadaki-accent);
+  outline-offset: 1px;
+}
+
+.note-add {
+  border: none;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-accent);
+  color: white;
+  padding: 0.65rem 1rem;
+  font-family: var(--itadaki-font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 42px;
+}
+
+.note-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* En pantalla angosta el texto de ejemplo no entra al lado de "Agregar". */
+@media (max-width: 380px) {
+  .card-actions {
+    flex-direction: column;
+  }
+
+  .card-note-btn {
+    max-width: none;
+  }
+}

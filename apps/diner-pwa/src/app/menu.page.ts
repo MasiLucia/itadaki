@@ -145,14 +145,56 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
             Elegir opciones
           </a>
         } @else {
-          <button
-            type="button"
-            class="card-add"
-            [disabled]="adding() === product.id"
-            (click)="quickAdd(product)"
-          >
-            {{ adding() === product.id ? 'Agregando…' : 'Agregar' }}
-          </button>
+          <div class="card-actions">
+            <button
+              type="button"
+              class="card-add"
+              [disabled]="adding() === product.id"
+              (click)="quickAdd(product)"
+            >
+              {{ adding() === product.id ? 'Agregando…' : 'Agregar' }}
+            </button>
+
+            <!-- Secundario a propósito: la mayoría pide el plato tal cual, y
+                 dos botones con el mismo peso obligan a elegir dos veces. Dice
+                 "Sin sal, sin cebolla…" y no "Agregar comentario" porque el
+                 ejemplo se entiende sin leer: es lo que el mozo escucharía. -->
+            <button
+              type="button"
+              class="card-note-btn"
+              [class.open]="noting() === product.id"
+              [attr.aria-expanded]="noting() === product.id"
+              (click)="toggleNote(product.id)"
+            >
+              Sin sal, sin cebolla…
+            </button>
+          </div>
+
+          @if (noting() === product.id) {
+            <div class="note-box">
+              <label class="itd-visually-hidden" [attr.for]="'note-' + product.id">
+                Indicación para la cocina de {{ display(product.name) }}
+              </label>
+              <input
+                [id]="'note-' + product.id"
+                type="text"
+                class="note-input"
+                placeholder="Sin cebolla, bien cocido…"
+                maxlength="280"
+                [value]="note()"
+                (input)="onNote($event)"
+                (keydown.enter)="quickAdd(product, note())"
+              />
+              <button
+                type="button"
+                class="note-add"
+                [disabled]="adding() === product.id || note().trim() === ''"
+                (click)="quickAdd(product, note())"
+              >
+                {{ adding() === product.id ? 'Agregando…' : 'Agregar con indicación' }}
+              </button>
+            </div>
+          }
         }
         </article>
             }
@@ -206,6 +248,10 @@ export class MenuPage {
   protected readonly session = inject(SessionStore);
   protected readonly adding = signal<string | null>(null);
 
+  /** Qué plato tiene la indicación abierta: uno a la vez. */
+  protected readonly noting = signal<string | null>(null);
+  protected readonly note = signal('');
+
   /** Product ids whose modifiers must be chosen before ordering. */
   private readonly requiredChoices = signal<ReadonlySet<string>>(new Set());
   protected readonly dietOptions = DIET_LABELS;
@@ -225,20 +271,47 @@ export class MenuPage {
    *
    * Most dishes have no options, and making every one of them a two-screen
    * trip is the difference between ordering and giving up.
+   *
+   * La indicación viaja por el mismo camino que ya usaba la ficha del plato:
+   * es el campo `notes` de la línea, que la cocina imprime debajo del nombre.
    */
-  protected async quickAdd(product: Product): Promise<void> {
+  protected async quickAdd(product: Product, notes = ''): Promise<void> {
     if (this.adding() !== null) return;
     this.adding.set(product.id);
 
+    const note = notes.trim();
     let ok = true;
     if (this.session.isJoined()) {
-      ok = await this.session.addLine(product.id, 1, '', []);
+      ok = await this.session.addLine(product.id, 1, note, []);
     } else {
-      this.cart.add(product, 1, [], '');
+      this.cart.add(product, 1, [], note);
     }
     this.adding.set(null);
+    this.closeNote();
 
     this.toast.show(ok ? `${product.name} agregado` : 'No pudimos agregarlo');
+  }
+
+  /**
+   * Abre la indicación dentro de la propia tarjeta.
+   *
+   * En la tarjeta y no en una pantalla aparte: escribir "sin cebolla" no
+   * justifica perder de vista la carta. La ficha del plato sigue teniendo su
+   * campo de nota completo para cuando además hay que elegir opciones.
+   */
+  protected toggleNote(productId: string): void {
+    const already = this.noting() === productId;
+    this.noting.set(already ? null : productId);
+    this.note.set('');
+  }
+
+  private closeNote(): void {
+    this.noting.set(null);
+    this.note.set('');
+  }
+
+  protected onNote(event: Event): void {
+    this.note.set((event.target as HTMLInputElement).value);
   }
 
   protected readonly categories = signal<readonly Category[]>([]);
