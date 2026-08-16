@@ -27,8 +27,15 @@ export type SessionError =
   | { readonly kind: 'TABLE_FULL'; readonly limit: number }
   | { readonly kind: 'DINER_NOT_FOUND'; readonly dinerId: string };
 
-/** Enough for a large table; also caps abuse from a leaked table token. */
-export const MAX_DINERS = 12;
+/**
+ * Cuánta gente puede sentarse en una misma sesión.
+ *
+ * Veinte cubre una mesa larga de cumpleaños, que es un caso real y no un
+ * abuso. Sigue siendo un techo y no una comodidad: el QR impreso no vence
+ * nunca, así que quien le sacó una foto puede sumarse desde su casa, y este
+ * número es lo único que limita cuántos entren por esa foto.
+ */
+export const MAX_DINERS = 20;
 
 const NICKNAME_PATTERN = /^[\p{L}\p{N} _'-]{1,20}$/u;
 
