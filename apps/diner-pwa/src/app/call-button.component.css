@@ -17,6 +17,30 @@
   box-shadow: var(--itadaki-shadow-raised);
   font-size: 1.35rem;
   cursor: pointer;
+  /* El gesto de arrastre lo maneja el componente: sin esto, el navegador se
+     queda con el movimiento vertical para hacer scroll y el timbre no se mueve. */
+  touch-action: none;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+/* Una vez movido, la posición la fija el componente en línea. El borde se
+   respeta igual desde ahí, así que acá sólo hay que soltar el `calc()`. */
+.fab.moved {
+  bottom: auto;
+  right: auto;
+}
+
+/* Levantado mientras se arrastra: confirma que el botón se está moviendo y no
+   que el toque falló. */
+.fab.dragging {
+  transform: scale(1.08);
+  box-shadow: var(--itadaki-shadow-panel);
+  cursor: grabbing;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab { transition: none; }
+  .fab.dragging { transform: none; }
 }
 
 .fab.waiting {

@@ -21,11 +21,71 @@ const PAYMENT_OPTIONS: ReadonlyArray<{ method: PaymentMethod; label: string; hin
   { method: 'UNDECIDED', label: 'Todavía no sé', hint: 'Lo definimos en la mesa' },
 ];
 
+/** A qué borde se pega, y a qué altura sobre el piso de la pantalla. */
+interface Placement {
+  readonly side: 'left' | 'right';
+  readonly bottom: number;
+}
+
+const STORAGE_KEY = 'itadaki.call-button.placement';
+
+/** Separación del borde, la misma que tenía fijada en el CSS. */
+const EDGE = 16;
+
+/** Debajo de esto el gesto sigue siendo un toque, no un arrastre. */
+const DRAG_THRESHOLD = 8;
+
+/** Deja siempre el botón entero dentro de la pantalla, con aire arriba y abajo. */
+const MIN_BOTTOM = 12;
+const FAB_SIZE = 52;
+
+function clampBottom(bottom: number): number {
+  const top = globalThis.innerHeight - FAB_SIZE - MIN_BOTTOM;
+  return Math.max(MIN_BOTTOM, Math.min(bottom, top));
+}
+
+/**
+ * Dónde lo dejó la última vez.
+ *
+ * Se guarda porque mover el timbre es una decisión sobre la mesa, no sobre la
+ * pantalla: quien lo corrió porque le tapaba la carta no quiere volver a
+ * correrlo al pasar al carrito.
+ */
+function readPlacement(): Placement | null {
+  try {
+    const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
+    if (raw === null || raw === undefined) return null;
+
+    const parsed = JSON.parse(raw) as Partial<Placement>;
+    if (parsed.side !== 'left' && parsed.side !== 'right') return null;
+    if (typeof parsed.bottom !== 'number' || !Number.isFinite(parsed.bottom)) return null;
+
+    // La pantalla pudo cambiar de tamaño entre sesiones — o ser otro teléfono.
+    return { side: parsed.side, bottom: clampBottom(parsed.bottom) };
+  } catch {
+    // Storage bloqueado o JSON corrupto: vuelve a la posición por defecto.
+    return null;
+  }
+}
+
+function savePlacement(placement: Placement): void {
+  try {
+    globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(placement));
+  } catch {
+    // Modo privado en iOS. Se movió igual, sólo no sobrevive a la recarga.
+  }
+}
+
 /**
  * Raising a hand, without raising a hand.
  *
  * Floating and always reachable because the moment someone needs a waiter is
  * never predictable — it is not a step in the ordering flow.
+ *
+ * Se puede arrastrar: la carta y el carrito tienen contenido justo debajo, y
+ * un timbre fijo terminaba tapando un precio o el botón de un plato según el
+ * largo de la lista. Se pega al borde más cercano en vez de quedar suelto en
+ * el medio, así nunca queda flotando sobre el texto.
  */
 @Component({
   selector: 'itd-call-button',
@@ -94,9 +154,18 @@ const PAYMENT_OPTIONS: ReadonlyArray<{ method: PaymentMethod; label: string; hin
         type="button"
         class="fab"
         [class.waiting]="anyWaiting()"
+        [class.dragging]="dragging()"
+        [class.moved]="placement() !== null"
+        [style.left.px]="placement()?.side === 'left' ? EDGE : null"
+        [style.right.px]="placement()?.side === 'right' ? EDGE : null"
+        [style.bottom.px]="placement()?.bottom ?? null"
         [attr.aria-expanded]="open()"
-        aria-label="Llamar a alguien"
-        (click)="toggle()"
+        aria-label="Llamar a alguien. Mantené apretado y arrastrá para moverlo"
+        (pointerdown)="grab($event)"
+        (pointermove)="drag($event)"
+        (pointerup)="drop($event)"
+        (pointercancel)="drop($event)"
+        (click)="tap()"
       >
         @if (anyWaiting()) {
           <span class="fab-dot" aria-hidden="true"></span>
@@ -116,6 +185,78 @@ export class CallButtonComponent {
   protected readonly askingPayment = signal(false);
 
   protected readonly anyWaiting = computed(() => this.calls.pending().length > 0);
+
+  /** Dónde quedó el timbre después de moverlo, o `null` si nunca lo movieron. */
+  protected readonly placement = signal<Placement | null>(readPlacement());
+  protected readonly dragging = signal(false);
+  protected readonly EDGE = EDGE;
+
+  /** Dónde empezó el gesto, para saber si fue un toque o un arrastre. */
+  private grabbedAt: { x: number; y: number; bottom: number } | null = null;
+  private moved = false;
+
+  /**
+   * Arrastrar para correrlo, tocar para abrirlo.
+   *
+   * Un solo botón hace las dos cosas, así que el gesto se decide por distancia:
+   * hasta `DRAG_THRESHOLD` sigue siendo un toque. Sin ese margen, el temblor
+   * normal de un pulgar sobre un botón de 52px cancelaba la mitad de los toques.
+   */
+  protected grab(event: PointerEvent): void {
+    const button = event.target as HTMLElement;
+    const box = button.getBoundingClientRect();
+
+    this.grabbedAt = {
+      x: event.clientX,
+      y: event.clientY,
+      // Desde el borde de abajo, que es como está posicionado: leerlo del DOM
+      // evita tener que resolver el `calc()` con `env()` a mano.
+      bottom: globalThis.innerHeight - box.bottom,
+    };
+    this.moved = false;
+  }
+
+  protected drag(event: PointerEvent): void {
+    const start = this.grabbedAt;
+    if (start === null) return;
+
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (!this.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+
+    if (!this.moved) {
+      this.moved = true;
+      this.dragging.set(true);
+      // Sigue al dedo aunque se salga del botón, y cierra el gesto incluso si
+      // el dedo termina sobre otro elemento.
+      (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+    }
+
+    this.placement.set({
+      side: event.clientX < globalThis.innerWidth / 2 ? 'left' : 'right',
+      bottom: clampBottom(start.bottom - dy),
+    });
+  }
+
+  protected drop(event: PointerEvent): void {
+    (event.target as HTMLElement).releasePointerCapture?.(event.pointerId);
+    this.grabbedAt = null;
+
+    if (this.moved) {
+      this.dragging.set(false);
+      const placed = this.placement();
+      if (placed !== null) savePlacement(placed);
+    }
+  }
+
+  /** El `click` que cierra un arrastre no debe abrir la hoja. */
+  protected tap(): void {
+    if (this.moved) {
+      this.moved = false;
+      return;
+    }
+    this.toggle();
+  }
 
   protected waiting(reason: CallReason): boolean {
     return this.calls.waitingFor().has(reason);
