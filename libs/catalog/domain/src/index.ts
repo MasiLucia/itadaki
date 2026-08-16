@@ -32,3 +32,10 @@ export {
   validateEditParams,
 } from './lib/image-edit';
 export { type LumaGrid, type FrameProposal, proposeFrame } from './lib/auto-frame';
+export {
+  type ParsedDish,
+  type ParsedLine,
+  type ParsedMenu,
+  DEFAULT_CATEGORY,
+  parseMenuText,
+} from './lib/menu-import';

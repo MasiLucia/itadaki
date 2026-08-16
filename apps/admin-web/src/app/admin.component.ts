@@ -11,6 +11,8 @@ import {
 import { type ImageEditParams } from '@itadaki/catalog/domain';
 import { ImageEditorComponent } from '@itadaki/shared/ui-image-editor';
 import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
+import { DecimalPipe } from '@angular/common';
+import { parseMenuText } from '@itadaki/catalog/domain';
 import { QrSheetComponent } from './qr-sheet.component';
 import { MetricsComponent } from './metrics.component';
 
@@ -73,7 +75,7 @@ const ROLE_NAMES: Record<string, string> = {
 @Component({
   selector: 'itd-admin',
   standalone: true,
-  imports: [ImageEditorComponent, LoginComponent, QrSheetComponent, MetricsComponent],
+  imports: [DecimalPipe, ImageEditorComponent, LoginComponent, QrSheetComponent, MetricsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './admin.component.css',
   template: `
@@ -180,7 +182,14 @@ const ROLE_NAMES: Record<string, string> = {
           <h2 class="panel-title">Tus platos</h2>
           <!-- Crear abre su propia pantalla: pegado a la lista hacía
                dudar si el formulario editaba un plato o creaba otro. -->
-          <button type="button" class="create" (click)="openNew()">+ plato nuevo</button>
+          <div class="panel-actions">
+            <!-- Cargar sesenta platos de a uno es lo que hace abandonar la
+                 prueba antes de empezar. -->
+            <button type="button" class="secondary" (click)="openImport()">
+              Traer mi carta
+            </button>
+            <button type="button" class="create" (click)="openNew()">+ plato nuevo</button>
+          </div>
         </div>
 
 
@@ -610,6 +619,92 @@ const ROLE_NAMES: Record<string, string> = {
         </div>
       </div>
     }
+
+    @if (modal() === 'importar') {
+      <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="importar-title">
+        <header class="modal-head">
+          <div>
+            <p class="modal-eyebrow">Traer mi carta</p>
+            <h2 class="modal-title" id="importar-title">Pegá tu carta</h2>
+          </div>
+          <button type="button" class="modal-close" (click)="closeModal()" aria-label="Cerrar">
+            ✕
+          </button>
+        </header>
+
+        <div class="modal-body import-body">
+          <p class="import-hint">
+            Copiala de donde la tengas — un Word, un Excel, un mensaje. Una línea por plato
+            con el precio al final, y las secciones solas en su renglón.
+          </p>
+
+          <textarea
+            class="import-text"
+            rows="10"
+            spellcheck="false"
+            placeholder="ENTRADAS&#10;Empanadas de carne - media docena  $3.400&#10;Provoleta  5.200&#10;&#10;PARRILLA&#10;Bife de chorizo  $8.500"
+            [value]="importText()"
+            (input)="onImportText($event)"
+          ></textarea>
+
+          @if (importText().trim() !== '') {
+            <!-- La vista previa es el punto: nadie guarda una carta entera a
+                 ciegas, y corregir acá es más barato que después. -->
+            <div class="preview">
+              <p class="preview-count">
+                <strong>{{ parsed().dishes.length }}</strong> platos en
+                <strong>{{ parsed().categories.length }}</strong> secciones
+              </p>
+
+              @if (parsed().skipped.length > 0) {
+                <p class="status error">
+                  {{ parsed().skipped.length }} líneas no se entendieron — revisalas y
+                  corregilas arriba
+                </p>
+                <ul class="skipped">
+                  @for (line of parsed().skipped; track line.lineNumber) {
+                    <li><span class="line-no">línea {{ line.lineNumber }}</span> {{ line.raw }}</li>
+                  }
+                </ul>
+              }
+
+              <ul class="preview-list">
+                @for (dish of parsed().dishes; track dish.name + dish.priceMinor) {
+                  <li class="preview-row">
+                    <span class="preview-cat">{{ dish.category }}</span>
+                    <span class="preview-name">
+                      {{ dish.name }}
+                      @if (dish.description !== '') {
+                        <em>{{ dish.description }}</em>
+                      }
+                    </span>
+                    <span class="preview-price">
+                      {{ dish.priceMinor / 100 | number: '1.0-0' }}
+                    </span>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+
+          @if (importResult(); as message) {
+            <p class="status error">{{ message }}</p>
+          }
+
+          <div class="sheet-actions">
+            <button
+              type="button"
+              class="create"
+              [disabled]="parsed().dishes.length === 0 || importing()"
+              (click)="confirmImport()"
+            >
+              {{ importing() ? 'Cargando…' : 'Agregar ' + parsed().dishes.length + ' platos' }}
+            </button>
+            <button type="button" class="secondary" (click)="closeModal()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    }
     }
   `,
 })
@@ -665,7 +760,60 @@ export class AdminComponent {
    * En la misma página, el formulario de alta pegado a la lista hacía dudar
    * si un plato se estaba creando o editando.
    */
-  protected readonly modal = signal<'nuevo' | 'editar' | 'opciones' | null>(null);
+  protected readonly modal = signal<'nuevo' | 'editar' | 'opciones' | 'importar' | null>(null);
+
+  /** El texto pegado y lo que se entendió de él. */
+  protected readonly importText = signal('');
+  protected readonly importing = signal(false);
+  protected readonly importResult = signal<string | null>(null);
+
+  protected readonly parsed = computed(() => parseMenuText(this.importText()));
+
+  protected openImport(): void {
+    this.importText.set('');
+    this.importResult.set(null);
+    this.modal.set('importar');
+  }
+
+  protected onImportText(event: Event): void {
+    this.importText.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  /**
+   * Guarda lo que la vista previa mostró.
+   *
+   * Se manda lo interpretado y no el texto: lo que se guarda es exactamente
+   * lo que la persona vio y aprobó en pantalla, no algo que el servidor
+   * vuelva a interpretar por su cuenta.
+   */
+  protected async confirmImport(): Promise<void> {
+    const { dishes } = this.parsed();
+    if (dishes.length === 0) return;
+
+    this.importing.set(true);
+    this.importResult.set(null);
+
+    try {
+      const response = await this.auth.apiFetch(`${API}/menu/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...this.auth.headers() },
+        body: JSON.stringify({ dishes }),
+      });
+
+      if (!response.ok) {
+        this.importResult.set('No pudimos cargar la carta. Probá de nuevo.');
+        return;
+      }
+
+      const body = (await response.json()) as { imported: number };
+      await this.load();
+      this.modal.set(null);
+      this.createdName.set(`${body.imported} platos`);
+      globalThis.setTimeout(() => this.createdName.set(null), 5000);
+    } finally {
+      this.importing.set(false);
+    }
+  }
 
   protected openNew(): void {
     this.createError.set(null);

@@ -426,4 +426,98 @@ export class MenuController {
 
     return { removed: groupId };
   }
+
+  /**
+   * Carga una carta entera de una vez.
+   *
+   * Un restaurante que ya trabaja no va a cargar sesenta platos de a uno para
+   * probar el sistema: abandona antes de llegar al décimo. Esto recibe lo que
+   * el navegador ya interpretó y confirmó en pantalla — el parseo vive en el
+   * dominio y corre allá, para que nadie guarde a ciegas.
+   *
+   * Las categorías se crean primero porque los platos las referencian, y una
+   * que ya existe se reusa: importar dos veces no debe duplicar "ENTRADAS".
+   */
+  @RequirePermission('menu:write')
+  @Post('import')
+  async importMenu(@Body() body: unknown, @TenantId() tenantId: string) {
+    const schema = z.object({
+      dishes: z
+        .array(
+          z.object({
+            name: z.string().min(1).max(60),
+            description: z.string().max(140).default(''),
+            priceMinor: z.number().int().min(0),
+            category: z.string().min(1).max(40),
+          }),
+        )
+        .min(1)
+        .max(300),
+    });
+
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) {
+      throw new HttpException(parsed.error.issues, HttpStatus.BAD_REQUEST);
+    }
+
+    const existing = await this.catalog.categories.list(tenantId);
+    if (existing.isErr()) {
+      throw new HttpException(existing.error, HttpStatus.BAD_GATEWAY);
+    }
+
+    // Por nombre en minúsculas: "Entradas" y "ENTRADAS" son la misma sección.
+    const byName = new Map(existing.value.map((c) => [c.name.toLowerCase(), c.id]));
+    let sortOrder = existing.value.length;
+
+    for (const name of new Set(parsed.data.dishes.map((d) => d.category))) {
+      if (byName.has(name.toLowerCase())) continue;
+
+      const created = await this.catalog.categoryWriter.save({
+        id: `${slugify(name)}-${Date.now().toString(36)}-${sortOrder}`,
+        tenantId,
+        name,
+        sortOrder: sortOrder++,
+        availability: null,
+      });
+      if (created.isOk()) byName.set(name.toLowerCase(), created.value.id);
+    }
+
+    const imported: string[] = [];
+    const failed: Array<{ name: string; reason: string }> = [];
+
+    for (const [index, dish] of parsed.data.dishes.entries()) {
+      const categoryId = byName.get(dish.category.toLowerCase());
+      if (categoryId === undefined) {
+        failed.push({ name: dish.name, reason: 'CATEGORIA_NO_CREADA' });
+        continue;
+      }
+
+      const price = Money.of(dish.priceMinor, 'ARS');
+      if (price.isErr()) {
+        failed.push({ name: dish.name, reason: 'PRECIO_INVALIDO' });
+        continue;
+      }
+
+      // El índice desempata dos platos con el mismo nombre en la misma carta.
+      const saved = await this.catalog.products.save({
+        id: `${slugify(dish.name)}-${Date.now().toString(36)}-${index}`,
+        tenantId,
+        categoryId,
+        name: dish.name,
+        description: dish.description,
+        price: price.value,
+        images: null,
+        allergens: [],
+        diets: [],
+        estimatedPrepMinutes: 10,
+        available: true,
+        station: 'COLD',
+      });
+
+      if (saved.isOk()) imported.push(saved.value.name);
+      else failed.push({ name: dish.name, reason: 'NO_SE_PUDO_GUARDAR' });
+    }
+
+    return { imported: imported.length, failed };
+  }
 }
