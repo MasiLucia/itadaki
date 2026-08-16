@@ -7,3 +7,7 @@ coverage/
 .image-store/
 # Los dumps llevan datos reales de clientes; nunca al repositorio.
 backups/
+# La cadena de conexión a la base de producción y las claves del bucket salen
+# por acá; un commit distraído las publica y no se borran del historial.
+.env
+.env.*
