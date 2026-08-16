@@ -17,19 +17,27 @@ const STORAGE_KEY = 'itadaki.table-token';
  * gone from the URL. Reading it at module load — which happens before
  * `bootstrapApplication` — is what makes a scanned QR survive that redirect.
  */
-function captureFromUrl(): string | null {
-  const fromUrl = new URLSearchParams(globalThis.location.search).get('t');
-  if (fromUrl === null || fromUrl === '') return null;
+function captureFromUrl(): { token: string | null; invite: string | null } {
+  const params = new URLSearchParams(globalThis.location.search);
+  const fromUrl = params.get('t');
+  // La invitación de quien ya está sentado, cuando se entra escaneando su QR
+  // en vez del impreso de la mesa.
+  const invite = params.get('i');
 
-  localStorage.setItem(STORAGE_KEY, fromUrl);
+  if (fromUrl !== null && fromUrl !== '') {
+    localStorage.setItem(STORAGE_KEY, fromUrl);
+  }
+
+  if (fromUrl === null && invite === null) return { token: null, invite: null };
 
   // Drop it from the address bar: a shared screenshot of the URL should
   // not hand someone else a working table token.
   const clean = new URL(globalThis.location.href);
   clean.searchParams.delete('t');
+  clean.searchParams.delete('i');
   globalThis.history.replaceState({}, '', clean.toString());
 
-  return fromUrl;
+  return { token: fromUrl === '' ? null : fromUrl, invite: invite === '' ? null : invite };
 }
 
 const CAPTURED = captureFromUrl();
@@ -65,8 +73,16 @@ function tableFromToken(token: string | null): string | null {
 
 @Injectable({ providedIn: 'root' })
 export class TableTokenStore {
-  readonly token = signal<string | null>(CAPTURED ?? localStorage.getItem(STORAGE_KEY));
+  readonly token = signal<string | null>(CAPTURED.token ?? localStorage.getItem(STORAGE_KEY));
   readonly hasToken = computed(() => this.token() !== null);
+
+  /**
+   * La invitación con la que se entró, si se entró por una.
+   *
+   * No se guarda en storage: vale una sola vez y vence en minutos, así que
+   * conservarla sólo serviría para reintentar algo que ya no funciona.
+   */
+  readonly invite = signal<string | null>(CAPTURED.invite);
 
   /** La mesa que dice el QR, disponible antes de unirse. */
   readonly tableLabel = computed(() => tableFromToken(this.token()));

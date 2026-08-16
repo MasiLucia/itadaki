@@ -59,18 +59,12 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
               @if (session.connected()) { · en vivo }
             </p>
 
-            <!-- Para el que llega tarde: sin esto tiene que ir a buscar al
-                 mozo, cuando la persona que lo puede ayudar está sentada al
-                 lado. Se muestra a pedido y no siempre, que es un código. -->
-            @if (session.joinCode(); as code) {
-              @if (showCode()) {
-                <p class="join-code">{{ code }}</p>
-              } @else {
-                <button type="button" class="join-code-toggle" (click)="showCode.set(true)">
-                  Ver código de la mesa
-                </button>
-              }
-            }
+            <!-- Para el que llega tarde: un QR de un solo uso en vez del PIN.
+                 Mostrar el PIN para que un amigo lo copie era mostrárselo
+                 también a quien mirara desde la mesa de al lado. -->
+            <button type="button" class="join-code-toggle" (click)="session.openInvite()">
+              Invitar a alguien
+            </button>
           </aside>
         }
       </div>
@@ -280,9 +274,6 @@ export class MenuPage {
   protected readonly cart = inject(CartStore);
   protected readonly session = inject(SessionStore);
   protected readonly adding = signal<string | null>(null);
-
-  /** El código queda tapado hasta que alguien lo pide, como cualquier código. */
-  protected readonly showCode = signal(false);
 
   /** Qué plato tiene la indicación abierta: uno a la vez. */
   protected readonly noting = signal<string | null>(null);

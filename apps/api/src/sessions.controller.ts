@@ -19,7 +19,8 @@ import {
   type SessionState,
 } from '@itadaki/ordering/application';
 import { groupByDiner } from '@itadaki/ordering/domain';
-import { PostgresTableStore } from '@itadaki/identity/infra';
+import { PostgresTableStore, TABLE_TOKEN_HOURS, signTableToken } from '@itadaki/identity/infra';
+import { type PostgresInviteStore } from '@itadaki/ordering/infra';
 import { z } from 'zod';
 import {
   type DinerScope,
@@ -38,6 +39,9 @@ import { RealtimeGateway } from './realtime.gateway';
 import { SessionsService } from './sessions.service';
 import { toMoneyDto, toOrderDto } from './contracts';
 
+/** A dónde apunta el QR de una invitación; el mismo destino que el impreso. */
+const DINER_APP_URL = process.env['DINER_APP_URL'] ?? 'http://localhost:4200';
+
 const joinSchema = z.object({
   /** Signed by the table's own secret; carries both tenant and table. */
   tableToken: z.string().min(1).max(2000),
@@ -49,8 +53,15 @@ const joinSchema = z.object({
    * da acceso a nada, porque se compara contra los que ya están en la mesa.
    */
   dinerId: z.string().min(1).max(64).optional(),
-  /** El código de la mesa; hace falta desde el segundo comensal. */
+  /** El código de la mesa, el que da el mozo al sentarla. */
   joinCode: z.string().min(1).max(8).optional(),
+  /**
+   * Invitación de quien ya está sentado, escaneada de su teléfono.
+   *
+   * Reemplaza al código: vale una vez y vence en minutos, así que el que llega
+   * tarde entra sin que nadie tenga que mostrar el PIN en pantalla.
+   */
+  invite: z.string().min(1).max(64).optional(),
 });
 
 const addSchema = z.object({
@@ -112,6 +123,11 @@ export class SessionsController {
 
   /** El código de cada mesa vive acá, no en la sesión. */
   private readonly tables = new PostgresTableStore(database);
+
+  /** Las invitaciones de un solo uso para el que llega tarde. */
+  private get invites(): PostgresInviteStore {
+    return this.sessions.invites;
+  }
 
   /**
    * Loads the session, confirming it is the caller's to touch.
@@ -280,7 +296,31 @@ export class SessionsController {
     // hacerlo entra sin código — y con una foto del QR eso se hace desde
     // cualquier lado.
     const seated = await this.tables.find(table.tenantId, table.tableId);
-    const expectedCode = seated.isOk() ? (seated.value.joinCode ?? undefined) : undefined;
+    const tableCode = seated.isOk() ? (seated.value.joinCode ?? undefined) : undefined;
+
+    // Una invitación válida reemplaza al código: la emitió alguien que ya está
+    // en la mesa, vale una vez y vence en minutos. Se canjea acá —marcándola
+    // usada— así dos teléfonos que escanean el mismo QR no entran los dos.
+    let expectedCode = tableCode;
+    if (parsed.data.invite !== undefined) {
+      const redeemed = await this.invites.redeem(
+        table.tenantId,
+        parsed.data.invite,
+        new Date(),
+      );
+      if (redeemed.isErr()) {
+        throw new HttpException({ kind: 'INVITE_INVALID' }, HttpStatus.FORBIDDEN);
+      }
+
+      // La invitación es de una mesa concreta. Si el QR escaneado es de otra,
+      // no sirve: si no, una invitación de la mesa 3 abriría la 1.
+      const open = await this.sessions.store.findOpenForTable(table.tenantId, table.tableId);
+      if (open.isErr() || open.value === null || open.value.session.id !== redeemed.value) {
+        throw new HttpException({ kind: 'INVITE_INVALID' }, HttpStatus.FORBIDDEN);
+      }
+
+      expectedCode = undefined;
+    }
 
     const run = joinTable({
       sessions: this.sessions.store,
@@ -309,15 +349,84 @@ export class SessionsController {
       throw new HttpException(result.error, status);
     }
 
-    // El código viaja sólo acá, a quien ya demostró conocerlo, y nunca en el
-    // DTO de la sesión: `GET /sessions/:id` está detrás del token de la mesa,
-    // así que incluirlo ahí se lo regalaría a la misma foto del QR de la que
-    // estamos defendiendo la mesa. Se devuelve para que quien ya está sentado
-    // se lo pueda pasar al que llega tarde sin ir a buscar al mozo.
+    // El PIN no vuelve en ningún caso. Quien ya está sentado suma gente con
+    // una invitación, que vale una vez y vence: mostrarle el PIN en pantalla
+    // era dárselo también a quien mirara desde la mesa de al lado.
     return {
       dinerId: result.value.dinerId,
       session: toSessionDto(result.value.state),
-      joinCode: expectedCode ?? null,
+    };
+  }
+
+  /**
+   * Una invitación para el que llegó tarde.
+   *
+   * La pide alguien que ya está sentado, desde su teléfono, y sale como QR
+   * para que el invitado lo escanee. Vale una sola vez y vence en dos minutos:
+   * quien la fotografíe desde otra mesa se lleva algo que ya no sirve.
+   *
+   * Sólo la emite quien está en la mesa. El token del QR no alcanza —es
+   * justamente lo que puede estar filtrado— así que además hay que ser uno de
+   * los comensales sentados, y para estarlo hubo que saber el PIN del mozo.
+   */
+  @Public()
+  @RateLimit('diner')
+  @TableScoped()
+  @Post(':id/invite')
+  async invite(
+    @Param('id') sessionId: string,
+    @Body() body: unknown,
+    @Scope() scope: DinerScope,
+  ) {
+    const parsed = z.object({ dinerId: z.string().min(1).max(64) }).safeParse(body);
+    if (!parsed.success) {
+      throw new HttpException(parsed.error.issues, HttpStatus.BAD_REQUEST);
+    }
+
+    const state = await this.sessionInScope(scope, sessionId, true);
+    const sentado = state.session.diners.some((diner) => diner.id === parsed.data.dinerId);
+    if (!sentado) {
+      throw new HttpException({ kind: 'NOT_AT_TABLE' }, HttpStatus.FORBIDDEN);
+    }
+
+    const created = await this.invites.create(
+      scope.tenantId,
+      sessionId,
+      parsed.data.dinerId,
+      new Date(),
+    );
+    if (created.isErr()) {
+      throw new HttpException(created.error, HttpStatus.BAD_GATEWAY);
+    }
+
+    // El link lleva un token de mesa además de la invitación: el invitado no
+    // escaneó el QR impreso, así que su teléfono no tiene por dónde saber en
+    // qué mesa está, y sin eso no puede pedir nada después de entrar.
+    //
+    // Con vencimiento, a diferencia del impreso: este no está pegado a ninguna
+    // mesa, así que puede morirse solo y conviene que lo haga. Quien fotografíe
+    // el QR de la invitación se lleva lo mismo que si fotografiara el de la
+    // mesa — y eso, sin el PIN, no abre nada.
+    const seated = await this.tables.find(scope.tenantId, state.session.tableId);
+    if (seated.isErr()) {
+      throw new HttpException(seated.error, HttpStatus.BAD_GATEWAY);
+    }
+
+    const now = Date.now();
+    const token = signTableToken(
+      {
+        tenantId: scope.tenantId,
+        tableId: state.session.tableId,
+        issuedAt: now,
+        expiresAt: now + TABLE_TOKEN_HOURS * 60 * 60_000,
+      },
+      seated.value.secret,
+    );
+
+    return {
+      code: created.value.code,
+      expiresAt: created.value.expiresAt.toISOString(),
+      url: `${DINER_APP_URL}/unirse?t=${encodeURIComponent(token)}&i=${encodeURIComponent(created.value.code)}`,
     };
   }
 

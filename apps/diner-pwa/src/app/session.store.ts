@@ -58,15 +58,8 @@ export class SessionStore {
   readonly connected = signal(false);
   readonly joinError = signal<string | null>(null);
 
-  /**
-   * El código de esta mesa, para poder decírselo a quien llega después.
-   *
-   * Sólo lo tiene quien ya entró: la API lo manda una vez, al unirse, a quien
-   * acaba de demostrar que lo conocía. Nunca en la lectura de la sesión — esa
-   * está detrás del token de la mesa, que es exactamente lo que el código
-   * protege.
-   */
-  readonly joinCode = signal<string | null>(null);
+  /** Si está abierta la hoja del QR para invitar a alguien. */
+  readonly inviting = signal(false);
 
   readonly isJoined = computed(() => this.session() !== null && this.myDinerId() !== null);
 
@@ -111,18 +104,43 @@ export class SessionStore {
     }
   }
 
+  openInvite(): void {
+    this.inviting.set(true);
+  }
+
+  closeInvite(): void {
+    this.inviting.set(false);
+  }
+
+  /**
+   * Pide una invitación para sumar a alguien que llegó tarde.
+   *
+   * Vale una vez y vence en dos minutos, así que se pide en el momento y no se
+   * guarda: el QR se dibuja, se escanea y se muere.
+   */
+  async invite(): Promise<{ url: string; expiresAt: number } | null> {
+    const sessionId = this.session()?.id;
+    const dinerId = this.myDinerId();
+    if (sessionId === undefined || dinerId === null) return null;
+
+    try {
+      const response = await this.api.send(`/sessions/${sessionId}/invite`, 'POST', { dinerId });
+      if (!response.ok) return null;
+
+      const created = (await response.json()) as { url: string; expiresAt: string };
+      return { url: created.url, expiresAt: new Date(created.expiresAt).getTime() };
+    } catch {
+      return null;
+    }
+  }
+
   /** Rejoins the same session after a reload so a refresh does not eject the diner. */
   private restore(): void {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw === null) return;
-      const saved = JSON.parse(raw) as {
-        sessionId: string;
-        dinerId: string;
-        joinCode?: string | null;
-      };
+      const saved = JSON.parse(raw) as { sessionId: string; dinerId: string };
       this.myDinerId.set(saved.dinerId);
-      this.joinCode.set(saved.joinCode ?? null);
 
       void this.refresh(saved.sessionId).then(() => {
         // A meal that already ended is not worth rejoining: restoring it puts
@@ -168,16 +186,28 @@ export class SessionStore {
     // la pestaña la mandaba contra "ese nombre ya está en la mesa" — y el
     // único nombre que quería usar era justamente ese.
     const anterior = this.storedDinerId();
+    const invitacion = this.table.invite();
 
     const response = await this.api.send('/sessions/join', 'POST', {
       tableToken,
       nickname,
       ...(anterior === null ? {} : { dinerId: anterior }),
       ...(joinCode === undefined || joinCode === '' ? {} : { joinCode }),
+      // Quien entra por el QR de un amigo no tiene el PIN, ni tiene por qué:
+      // la invitación ya prueba que alguien de la mesa lo dejó pasar.
+      ...(invitacion === null ? {} : { invite: invitacion }),
     });
 
     if (!response.ok) {
       const detail = (await response.json().catch(() => null)) as { kind?: string } | null;
+
+      if (detail?.kind === 'INVITE_INVALID') {
+        // Vencida, ya usada por otro, o de otra mesa. Se dice sin distinguir
+        // cuál de las tres: el que llegó tarde sólo necesita pedir otra.
+        this.table.invite.set(null);
+        this.joinError.set('Esa invitación ya no sirve — pedile otra a tu mesa');
+        return false;
+      }
 
       if (detail?.kind === 'WRONG_JOIN_CODE') {
         this.joinError.set(
@@ -200,23 +230,14 @@ export class SessionStore {
       return false;
     }
 
-    const created = (await response.json()) as {
-      dinerId: string;
-      session: SessionDto;
-      joinCode: string | null;
-    };
+    const created = (await response.json()) as { dinerId: string; session: SessionDto };
     this.myDinerId.set(created.dinerId);
     this.session.set(created.session);
-    this.joinCode.set(created.joinCode);
+    // El PIN no se guarda porque no vuelve: para sumar gente está la
+    // invitación, que se pide en el momento y vale una sola vez.
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({
-        sessionId: created.session.id,
-        dinerId: created.dinerId,
-        // Guardado para que recargar no lo pierda: es lo que esta persona le
-        // dice al que llega tarde, y la API sólo lo manda al entrar.
-        joinCode: created.joinCode,
-      }),
+      JSON.stringify({ sessionId: created.session.id, dinerId: created.dinerId }),
     );
 
     this.listen(created.session.id);

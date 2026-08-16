@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { SessionStore } from './session.store';
 import { TableTokenStore } from './table-token.store';
@@ -44,25 +44,32 @@ const SUGGESTIONS = ['Ana', 'Beto', 'Cami', 'Dani', 'Eli', 'Fede', 'Gaby', 'Nico
           }
         </div>
 
-        <!-- Desde el primero: el código es de la mesa y existe antes de que
-             nadie escanee. Es lo único que separa a quien está sentado en el
-             salón de quien tiene una foto del QR en el teléfono. -->
-        <label class="code-label" for="join-code">Código de la mesa</label>
-        <p class="code-hint">
-          Te lo da el mozo al sentarte. Si ya hay alguien de tu mesa adentro,
-          también lo puede ver en su teléfono.
-        </p>
-        <input
-          id="join-code"
-          class="input code"
-          type="text"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          maxlength="6"
-          placeholder="000000"
-          [value]="code()"
-          (input)="onCode($event)"
-        />
+        <!-- Quien llegó por el QR de un amigo ya está autorizado: la
+             invitación lo prueba, y pedirle además el PIN sería mandarlo a
+             preguntar en voz alta justo lo que el QR vino a evitar. -->
+        @if (table.invite() !== null) {
+          <p class="code-hint invited">Te invitaron a la mesa — no hace falta código.</p>
+        } @else {
+          <!-- Desde el primero: el código es de la mesa y existe antes de que
+               nadie escanee. Es lo único que separa a quien está sentado en el
+               salón de quien tiene una foto del QR en el teléfono. -->
+          <label class="code-label" for="join-code">Código de la mesa</label>
+          <p class="code-hint">
+            Te lo da el mozo al sentarte. Si ya hay alguien de tu mesa adentro,
+            te puede invitar desde su teléfono.
+          </p>
+          <input
+            id="join-code"
+            class="input code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            placeholder="000000"
+            [value]="code()"
+            (input)="onCode($event)"
+          />
+        }
 
         @if (store.joinError(); as error) {
           <p class="error" role="alert">{{ error }}</p>
@@ -71,7 +78,7 @@ const SUGGESTIONS = ['Ana', 'Beto', 'Cami', 'Dani', 'Eli', 'Fede', 'Gaby', 'Nico
         <button
           type="submit"
           class="cta"
-          [disabled]="nickname().trim() === '' || code().length < 6 || busy() || !table.hasToken()"
+          [disabled]="nickname().trim() === '' || !codeReady() || busy() || !table.hasToken()"
         >
           {{ busy() ? 'Entrando…' : 'Entrar a la mesa →' }}
         </button>
@@ -88,6 +95,11 @@ export class JoinPage {
   protected readonly nickname = signal('');
   protected readonly code = signal('');
   protected readonly busy = signal(false);
+
+  /** Con invitación no hay código que completar: ya viene autorizado. */
+  protected readonly codeReady = computed(
+    () => this.table.invite() !== null || this.code().length === 6,
+  );
 
   protected onInput(event: Event): void {
     this.nickname.set((event.target as HTMLInputElement).value);

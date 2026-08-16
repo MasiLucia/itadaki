@@ -24,6 +24,7 @@
 .error { color: white; background: var(--itadaki-accent); border-radius: var(--itadaki-radius-chip); padding: 0.6rem 0.8rem; font-size: 0.83rem; font-weight: 600; margin: 0; }
 .code-label { font-size: 0.8rem; font-weight: 700; color: var(--itadaki-ink-strong); margin: 0.3rem 0 0; }
 .code-hint { font-size: 0.78rem; color: var(--itadaki-ink-subtle); margin: 0; line-height: 1.45; }
+.code-hint.invited { color: var(--itadaki-status-ready-fg); background: var(--itadaki-status-ready-bg); border-radius: var(--itadaki-radius-chip); padding: 0.6rem 0.8rem; font-weight: 600; }
 /* Dígitos separados y de ancho fijo: se dicta en voz alta y se compara de a uno. */
 .input.code { font-variant-numeric: tabular-nums; letter-spacing: 0.35em; text-indent: 0.35em; }
 .cta { background: var(--itadaki-ink); color: var(--itadaki-surface); border: none; border-radius: var(--itadaki-radius-pill); padding: 1rem; font-family: var(--itadaki-font-display); font-weight: 600; font-size: 0.95rem; cursor: pointer; box-shadow: var(--itadaki-shadow-cta); min-height: 48px; }

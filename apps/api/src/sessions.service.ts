@@ -1,6 +1,10 @@
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { type SessionReader, type SessionWriter } from '@itadaki/ordering/application';
-import { InMemorySessionStore, PostgresSessionStore } from '@itadaki/ordering/infra';
+import {
+  InMemorySessionStore,
+  PostgresInviteStore,
+  PostgresSessionStore,
+} from '@itadaki/ordering/infra';
 import { database } from './database';
 import { log } from './logger';
 
@@ -25,6 +29,8 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
       ? new PostgresSessionStore(database)
       : new InMemorySessionStore();
 
+  readonly invites = new PostgresInviteStore(database);
+
   private sweeper: ReturnType<typeof setInterval> | null = null;
 
   onModuleInit(): void {
@@ -48,6 +54,13 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     const closed = await this.store.closeStale(STALE_AFTER_HOURS);
     if (closed.isOk() && closed.value > 0) {
       log.info('abandoned sessions closed', { closed: closed.value });
+    }
+
+    // Las invitaciones vencidas no sirven para nada y se acumulan de a una por
+    // invitado. Van con el mismo barrido para no tener dos relojes corriendo.
+    const purged = await this.invites.purgeExpired(new Date());
+    if (purged.isOk() && purged.value > 0) {
+      log.info('expired invites purged', { purged: purged.value });
     }
   }
 }
