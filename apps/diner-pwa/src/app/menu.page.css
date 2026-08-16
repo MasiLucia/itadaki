@@ -53,13 +53,19 @@
   white-space: nowrap;
 }
 
-/* Se envuelven hacia la izquierda: una mesa de ocho no puede empujar el título. */
+/* Una sola fila, siempre: el excedente lo cuenta el círculo "+N". */
 .table-tag-diners {
   display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.25rem;
-  max-width: 8.5rem;
+}
+
+/* El sobrante se lee como un dato, no como una persona más: sin color de la
+   paleta, que es lo que identifica a cada comensal. */
+.avatar-more {
+  background: var(--itadaki-surface-sunken);
+  color: var(--itadaki-ink-muted);
+  font-size: 0.6rem;
 }
 
 .table-tag-count {

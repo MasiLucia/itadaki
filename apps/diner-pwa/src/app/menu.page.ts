@@ -34,13 +34,21 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
           <aside class="table-tag" aria-label="Mesa y comensales">
             <p class="table-tag-name">Mesa {{ session.tableLabel() }}</p>
 
+            <!-- Una fila, sea una mesa de dos o un cumpleaños de doce. Con
+                 todos los círculos, una mesa llena ocupaba tres filas y
+                 empujaba el buscador y los chips fuera de la pantalla. -->
             <div class="table-tag-diners">
-              @for (diner of session.session()?.diners ?? []; track diner.id) {
+              @for (diner of visibleDiners(); track diner.id) {
                 <span
                   class="avatar"
                   [style.background]="dinerColor(diner.colorIndex)"
                   [attr.title]="diner.nickname"
                 >{{ initials(diner.nickname) }}</span>
+              }
+              @if (hiddenDiners() > 0) {
+                <span class="avatar avatar-more" [attr.title]="hiddenNames()">
+                  +{{ hiddenDiners() }}
+                </span>
               }
             </div>
 
@@ -333,6 +341,34 @@ export class MenuPage {
   protected readonly search = signal('');
 
   protected readonly dinerCount = computed(() => (this.session.session()?.diners ?? []).length);
+
+  /**
+   * Cuántos círculos entran en una fila al lado del título.
+   *
+   * Cuatro es lo que da el ancho del bloque; el quinto ya baja a otra fila y el
+   * alto de la cabecera empieza a comerse la carta.
+   */
+  private readonly AVATAR_SLOTS = 4;
+
+  protected readonly visibleDiners = computed(() => {
+    const diners = this.session.session()?.diners ?? [];
+    // Con uno solo de sobra conviene mostrarlo antes que poner "+1", que ocupa
+    // exactamente lo mismo y dice menos.
+    if (diners.length <= this.AVATAR_SLOTS + 1) return diners;
+    return diners.slice(0, this.AVATAR_SLOTS);
+  });
+
+  protected readonly hiddenDiners = computed(
+    () => this.dinerCount() - this.visibleDiners().length,
+  );
+
+  /** Los que no entraron, para el tooltip del "+N". */
+  protected readonly hiddenNames = computed(() =>
+    (this.session.session()?.diners ?? [])
+      .slice(this.visibleDiners().length)
+      .map((diner) => diner.nickname)
+      .join(', '),
+  );
 
   /**
    * Filtering runs in the view rather than re-querying: the whole menu is
