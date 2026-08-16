@@ -80,25 +80,9 @@ export class BillStore {
    * Until this lands the bill keeps re-reading the table, so anything ordered
    * after asking for it still gets charged.
    */
-  async settle(sessionId: string): Promise<boolean> {
-    this.busy.set(true);
-    this.error.set(null);
-
-    try {
-      const response = await this.api.fetch(`/bills/${sessionId}/settle`, { method: 'POST' });
-      if (!response.ok) {
-        this.error.set('no pudimos cerrar la cuenta');
-        return false;
-      }
-      this.bill.set((await response.json()) as BillDto);
-      return true;
-    } catch {
-      this.error.set('sin conexión');
-      return false;
-    } finally {
-      this.busy.set(false);
-    }
-  }
+  // Cerrar la cuenta salió de acá: la API lo pide con permiso `orders:advance`
+  // y este teléfono nunca lo tiene. Lo hace el mozo desde salón, después de
+  // cobrar; desde el comensal sale el aviso, que es una llamada a la mesa.
 
   /** Splits are computed server-side and never persisted, so the table can try options. */
   async computeSplit(

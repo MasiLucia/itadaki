@@ -111,8 +111,13 @@ const CALL_LABELS: Record<string, string> = {
                 @if (mesa.since !== null) {
                   <span class="waited">comieron {{ waitedSince(mesa.since) }}</span>
                 }
-                <!-- Muestra lo que debe en la confirmación y libera igual:
-                     mucha gente paga en la caja, y el mozo es el que sabe. -->
+                <!-- Cobrar es la acción normal y cierra la cuenta; liberar sin
+                     cobrar existe para la mesa que pagó por fuera del sistema,
+                     y dice cuánto debe antes de hacerlo. -->
+                <button type="button" class="action" (click)="charge(mesa.sessionId)">
+                  Cobré {{ money(mesa.owed) }}
+                </button>
+
                 @if (confirming() === mesa.sessionId) {
                   <button
                     type="button"
@@ -124,10 +129,10 @@ const CALL_LABELS: Record<string, string> = {
                 } @else {
                   <button
                     type="button"
-                    class="action"
+                    class="release"
                     (click)="confirming.set(mesa.sessionId)"
                   >
-                    Liberar
+                    Liberar sin cobrar
                   </button>
                 }
               </div>
@@ -247,6 +252,12 @@ export class FloorComponent implements OnDestroy {
   protected async release(sessionId: string): Promise<void> {
     this.confirming.set(null);
     await this.store.releaseTable(sessionId);
+  }
+
+  /** Un solo toque: cobrar es lo que pasa en casi todas las mesas. */
+  protected async charge(sessionId: string): Promise<void> {
+    this.confirming.set(null);
+    await this.store.chargeTable(sessionId);
   }
 
   private readonly tick = signal(Date.now());

@@ -28,7 +28,7 @@ import {
 import { lineTotal as cartLineTotal } from '@itadaki/ordering/domain';
 import { Money, type CurrencyCode, type MoneyError, ok } from '@itadaki/shared/domain';
 import { z } from 'zod';
-import { type DinerScope, Public, Scope, TableScoped } from './auth';
+import { type DinerScope, Public, RequirePermission, Scope, TableScoped } from './auth';
 import { BillsService } from './bills.service';
 import { SessionsService } from './sessions.service';
 import { OrdersService } from './orders.service';
@@ -202,8 +202,14 @@ export class BillsController {
    * Until this is called the bill keeps following the shared cart, so a coffee
    * ordered after asking for the bill still gets charged. After it, the
    * document is immutable — a reprint has to match what was paid.
+   *
+   * Cobrar es un acto del local, así que va detrás de `orders:advance` — el
+   * mismo permiso que libera una mesa. Antes alcanzaba con el token de la mesa:
+   * cualquiera sentado ahí cerraba su propia cuenta sin pagar, y quien le
+   * hubiera sacado una foto al QR podía hacerlo desde su casa. El comensal
+   * ahora avisa que pagó, y el mozo es quien lo confirma.
    */
-  @Public()
+  @RequirePermission('orders:advance')
   @TableScoped()
   @Post(':sessionId/settle')
   async settle(@Param('sessionId') sessionId: string, @Scope() scope: DinerScope) {

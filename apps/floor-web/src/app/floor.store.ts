@@ -221,6 +221,32 @@ export class FloorStore {
   }
 
   /**
+   * Marca la cuenta como cobrada y libera la mesa.
+   *
+   * Cobrar dejó de estar del lado del comensal: cualquiera sentado en la mesa
+   * cerraba su propia cuenta sin pagar, y quien le sacara una foto al QR podía
+   * hacerlo desde afuera. Ahora el teléfono avisa y esto lo confirma.
+   *
+   * El `settle` de la API cierra la sesión también, así que no hace falta
+   * liberar aparte.
+   */
+  async chargeTable(sessionId: string): Promise<void> {
+    const response = await fetch(`${API}/bills/${sessionId}/settle`, {
+      method: 'POST',
+      headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
+    });
+    if (this.auth.expired(response)) return;
+
+    // 404: la mesa nunca pidió la cuenta, así que no hay documento que cerrar.
+    // Liberarla igual es lo que el mozo venía a hacer.
+    if (response.status === 404) {
+      await this.releaseTable(sessionId);
+      return;
+    }
+    if (response.ok) await this.refresh();
+  }
+
+  /**
    * Libera una mesa que se fue sin cerrar la cuenta.
    *
    * Mucha gente paga en la caja y se va sin tocar el teléfono. Esa mesa queda

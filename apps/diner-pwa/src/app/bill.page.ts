@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { type PaymentMethod } from '@itadaki/ordering/domain';
 import { DINER_PALETTE } from '@itadaki/shared/ui-tokens';
 import { BackLinkComponent } from './back-link.component';
+import { CallStore } from './call.store';
 import { BillStore, type MoneyDto, type SplitKind, type TipChoice } from './bill.store';
 import { SessionStore } from './session.store';
 
@@ -172,19 +174,26 @@ const CURRENCIES = ['ARS', 'USD', 'EUR', 'BRL'] as const;
       <footer class="foot">
         @if (bill.status === 'SETTLED') {
           <p class="settled" role="status">cuenta cerrada · gracias!</p>
+        } @else if (told()) {
+          <!-- Cerrar la cuenta lo hace el local. Desde acá sólo se avisa, y
+               eso es lo que dice la pantalla: prometer "listo, cerrada" sería
+               mentir sobre algo que todavía no pasó. -->
+          <p class="settled" role="status">le avisamos al mozo · ya se acerca</p>
         } @else if (confirming()) {
-          <!-- Settling is one-way: anything ordered afterwards is not on it. -->
-          <p class="confirm-note">¿ya pagaron? la cuenta se cierra y no se puede reabrir</p>
+          <p class="confirm-note">avisamos al mozo que van a pagar. ¿cómo lo hacen?</p>
           <div class="confirm-row">
-            <button type="button" class="cta ghost" (click)="confirming.set(false)">
-              todavía no
+            <button type="button" class="cta ghost" [disabled]="calls.busy()" (click)="tell('CASH')">
+              efectivo
             </button>
-            <button type="button" class="cta" [disabled]="store.busy()" (click)="settle()">
-              {{ store.busy() ? 'cerrando…' : 'sí, cerrar' }}
+            <button type="button" class="cta" [disabled]="calls.busy()" (click)="tell('CARD')">
+              tarjeta
             </button>
           </div>
+          @if (calls.error(); as message) {
+            <p class="confirm-note" role="alert">{{ message }}</p>
+          }
         } @else {
-          <button type="button" class="cta" (click)="confirming.set(true)">pagar en caja</button>
+          <button type="button" class="cta" (click)="confirming.set(true)">pedir la cuenta</button>
         }
       </footer>
     } @else {
@@ -206,6 +215,7 @@ const CURRENCIES = ['ARS', 'USD', 'EUR', 'BRL'] as const;
 export class BillPage {
   protected readonly store = inject(BillStore);
   protected readonly session = inject(SessionStore);
+  protected readonly calls = inject(CallStore);
 
   protected readonly splitOptions = SPLIT_LABELS;
   protected readonly tipOptions = TIP_OPTIONS;
@@ -237,11 +247,21 @@ export class BillPage {
 
   protected readonly confirming = signal(false);
 
-  protected async settle(): Promise<void> {
+  /** Ya salió el aviso al salón, para no mandar tres seguidos. */
+  protected readonly told = computed(() => this.calls.waitingFor().has('BILL'));
+
+  /**
+   * Avisa que la mesa va a pagar, con qué medio.
+   *
+   * El mozo ve el pedido y sabe si llevar el posnet. Cerrar la cuenta es
+   * después, y del lado del local: el teléfono del comensal no puede dar por
+   * cobrada una cuenta — antes podía, y bastaba con tocar un botón.
+   */
+  protected async tell(method: PaymentMethod): Promise<void> {
     const id = this.sessionId();
     if (id === null) return;
 
-    const done = await this.store.settle(id);
+    const done = await this.calls.raise(id, 'BILL', '', method);
     if (done) this.confirming.set(false);
   }
 

@@ -241,6 +241,26 @@
   border-left: 5px solid var(--itadaki-status-late);
 }
 
+/* Dos acciones apiladas y el monto largo: la columna necesita más aire que
+   una tarjeta de un solo botón. */
+.owing-card .card-side {
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+/* Liberar sin cobrar es la salida de excepción: disponible, no destacada. */
+.owing-card .release {
+  border: none;
+  background: none;
+  padding: 0.25rem 0;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-subtle);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .amount {
   font-family: var(--itadaki-font-display);
   font-size: 1.05rem;
