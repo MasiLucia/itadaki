@@ -1208,6 +1208,35 @@
   color: var(--itadaki-ink-soft);
 }
 
+/* Subir un archivo es la alternativa a pegar, no el camino principal: el que
+   tiene la carta en un mensaje no tiene ningún archivo que subir. */
+.import-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  border: 1.5px dashed var(--itadaki-border);
+  border-radius: var(--itadaki-radius-pill);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-soft);
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease;
+}
+
+.import-file:hover {
+  border-color: var(--itadaki-accent);
+  color: var(--itadaki-accent);
+}
+
+.import-file input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .import-text {
   width: 100%;
   padding: 0.8rem 0.9rem;

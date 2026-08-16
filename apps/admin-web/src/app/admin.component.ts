@@ -12,7 +12,7 @@ import { type ImageEditParams } from '@itadaki/catalog/domain';
 import { ImageEditorComponent } from '@itadaki/shared/ui-image-editor';
 import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
 import { DecimalPipe } from '@angular/common';
-import { parseMenuText } from '@itadaki/catalog/domain';
+import { csvToMenuText, parseMenuText } from '@itadaki/catalog/domain';
 import { QrSheetComponent } from './qr-sheet.component';
 import { MetricsComponent } from './metrics.component';
 
@@ -638,6 +638,17 @@ const ROLE_NAMES: Record<string, string> = {
             con el precio al final, y las secciones solas en su renglón.
           </p>
 
+          <!-- El archivo cae en el mismo cuadro: se puede corregir a mano
+               antes de guardar, sin volver a Excel. -->
+          <label class="import-file">
+            <input
+              type="file"
+              accept=".csv,.txt,.tsv,text/csv,text/plain"
+              (change)="onImportFile($event)"
+            />
+            <span>o subí un archivo (.csv o .txt)</span>
+          </label>
+
           <textarea
             class="import-text"
             rows="10"
@@ -777,6 +788,35 @@ export class AdminComponent {
 
   protected onImportText(event: Event): void {
     this.importText.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  /**
+   * Sube un archivo y lo deja en el mismo cuadro de texto.
+   *
+   * El archivo no es un camino aparte: se convierte a las mismas líneas y
+   * pasa por la misma vista previa. Así hay un solo comportamiento probado,
+   * y quien sube una planilla puede corregirla a mano antes de guardar sin
+   * tener que volver a Excel.
+   */
+  protected async onImportFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file === undefined) return;
+
+    this.importResult.set(null);
+
+    try {
+      const raw = await file.text();
+      // Una planilla trae separadores; un texto pegado no. Mirar el contenido
+      // y no la extensión evita fallar con un .txt exportado de Excel.
+      const looksTabular = /^[^\n]*[;,][^\n]*[;,]/.test(raw) || /,\s*\d+\s*$/m.test(raw);
+      this.importText.set(looksTabular ? csvToMenuText(raw) : raw);
+    } catch {
+      this.importResult.set('No pudimos leer el archivo. Probá copiando el texto.');
+    } finally {
+      // Permite volver a elegir el mismo archivo si lo corrigieron afuera.
+      input.value = '';
+    }
   }
 
   /**

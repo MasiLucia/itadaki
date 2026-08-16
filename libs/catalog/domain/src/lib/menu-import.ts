@@ -137,3 +137,139 @@ export function parseMenuText(text: string): ParsedMenu {
 
   return { dishes, categories, skipped };
 }
+
+/**
+ * Una tabla, como la exporta un Excel.
+ *
+ * El que tiene la carta en una planilla la guarda como CSV y la sube: pedirle
+ * que copie y pegue celda por celda sería peor que el trabajo que esto viene
+ * a ahorrar. Se convierte a las mismas líneas que entiende `parseMenuText`,
+ * para que haya un solo camino probado en vez de dos.
+ *
+ * No exige un orden de columnas: busca los encabezados por su nombre, porque
+ * cada planilla los pone donde quiere. Si no encuentra encabezados, asume el
+ * orden más común — nombre, precio, categoría — que es como lo escribiría
+ * cualquiera sin pensarlo.
+ */
+
+/** Cómo suele llamarse cada columna en una planilla de carta. */
+const COLUMN_NAMES = {
+  name: ['nombre', 'plato', 'producto', 'item', 'descripcion corta', 'name', 'product'],
+  price: ['precio', 'valor', 'importe', 'price', 'monto', '$'],
+  category: ['categoria', 'seccion', 'rubro', 'grupo', 'category', 'section'],
+  description: ['descripcion', 'detalle', 'ingredientes', 'description', 'detail'],
+} as const;
+
+/** Saca tildes y espacios, para comparar encabezados escritos de cualquier forma. */
+function normalise(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+/**
+ * Parte una línea de CSV respetando las comillas.
+ *
+ * Una descripción con coma — "milanesa, papas y ensalada" — viene entre
+ * comillas justamente para que no se lea como tres columnas.
+ */
+function splitCsvLine(line: string, separator: string): string[] {
+  const cells: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+
+    if (char === '"') {
+      // Dos comillas seguidas dentro de una celda son una comilla literal.
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === separator && !inQuotes) {
+      cells.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  cells.push(current);
+  return cells.map((cell) => cell.trim());
+}
+
+/** Coma o punto y coma: Excel en español exporta con punto y coma. */
+function detectSeparator(firstLine: string): string {
+  const semis = (firstLine.match(/;/g) ?? []).length;
+  const commas = (firstLine.match(/,/g) ?? []).length;
+  return semis > commas ? ';' : ',';
+}
+
+function findColumn(headers: readonly string[], names: readonly string[]): number {
+  return headers.findIndex((header) => names.includes(normalise(header)));
+}
+
+/**
+ * Convierte una tabla en las líneas que `parseMenuText` ya sabe leer.
+ *
+ * Devolver texto y no platos es deliberado: la vista previa, los errores por
+ * línea y el redondeo de precios ya están resueltos y probados en un solo
+ * lugar, y duplicarlos acá sería tener dos comportamientos que se separan.
+ */
+export function csvToMenuText(csv: string): string {
+  const lines = csv.split(/\r?\n/).filter((line) => line.trim() !== '');
+  if (lines.length === 0) return '';
+
+  const separator = detectSeparator(lines[0] ?? '');
+  const rows = lines.map((line) => splitCsvLine(line, separator));
+
+  const headers = rows[0] ?? [];
+  let nameAt = findColumn(headers, COLUMN_NAMES.name);
+  let priceAt = findColumn(headers, COLUMN_NAMES.price);
+  let categoryAt = findColumn(headers, COLUMN_NAMES.category);
+  let descriptionAt = findColumn(headers, COLUMN_NAMES.description);
+
+  // Sin encabezados reconocibles, la primera fila ya es un plato y se asume
+  // el orden más común: nombre, precio, categoría.
+  const hasHeaders = nameAt !== -1 || priceAt !== -1;
+  const body = hasHeaders ? rows.slice(1) : rows;
+  if (!hasHeaders) {
+    nameAt = 0;
+    priceAt = 1;
+    categoryAt = 2;
+    descriptionAt = -1;
+  }
+
+  const out: string[] = [];
+  let currentCategory = '';
+
+  for (const row of body) {
+    const name = (row[nameAt] ?? '').trim();
+    const price = priceAt === -1 ? '' : (row[priceAt] ?? '').trim();
+    if (name === '' && price === '') continue;
+
+    const category = categoryAt === -1 ? '' : (row[categoryAt] ?? '').trim();
+    if (category !== '' && category !== currentCategory) {
+      // La sección va sola en su renglón, que es como parseMenuText la
+      // reconoce; repetirla en cada fila la volvería un plato sin precio.
+      if (out.length > 0) out.push('');
+      out.push(category);
+      currentCategory = category;
+    }
+
+    const description = descriptionAt === -1 ? '' : (row[descriptionAt] ?? '').trim();
+    const left = description === '' ? name : `${name} - ${description}`;
+    out.push(price === '' ? left : `${left} ${price}`);
+  }
+
+  return out.join('\n');
+}

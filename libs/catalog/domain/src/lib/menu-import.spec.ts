@@ -1,4 +1,4 @@
-import { DEFAULT_CATEGORY, parseMenuText } from './menu-import';
+import { DEFAULT_CATEGORY, csvToMenuText, parseMenuText } from './menu-import';
 
 describe('leer una carta pegada de otro lado', () => {
   it('lee un plato con su precio', () => {
@@ -126,5 +126,93 @@ describe('leer una carta pegada de otro lado', () => {
 
     expect(dishes[0]?.name).toBe('Pizza 4 quesos');
     expect(dishes[0]?.priceMinor).toBe(780_000);
+  });
+});
+
+describe('subir la carta como planilla', () => {
+  /** Lo que importa es el resultado final, no el texto intermedio. */
+  const importar = (csv: string) => parseMenuText(csvToMenuText(csv));
+
+  it('lee una planilla con encabezados', () => {
+    const csv = ['nombre,precio,categoria', 'Empanadas,3400,Entradas'].join('\n');
+    const { dishes } = importar(csv);
+
+    expect(dishes).toHaveLength(1);
+    expect(dishes[0]?.name).toBe('Empanadas');
+    expect(dishes[0]?.priceMinor).toBe(340_000);
+    expect(dishes[0]?.category).toBe('Entradas');
+  });
+
+  it('no exige un orden de columnas', () => {
+    // Cada planilla las pone donde quiere; buscarlas por nombre evita pedirle
+    // a alguien que reordene su Excel antes de subirlo.
+    const csv = ['Categoria,Precio,Plato', 'Parrilla,8500,Bife de chorizo'].join('\n');
+    const { dishes } = importar(csv);
+
+    expect(dishes[0]?.name).toBe('Bife de chorizo');
+    expect(dishes[0]?.category).toBe('Parrilla');
+  });
+
+  it('reconoce los encabezados con tildes y mayúsculas', () => {
+    const csv = ['NOMBRE;PRECIO;CATEGORÍA', 'Flan;2600;Postres'].join('\n');
+    expect(importar(csv).dishes[0]?.category).toBe('Postres');
+  });
+
+  it('acepta punto y coma, que es como exporta Excel en español', () => {
+    const csv = ['nombre;precio', 'Provoleta;5200'].join('\n');
+    expect(importar(csv).dishes[0]?.priceMinor).toBe(520_000);
+  });
+
+  it('respeta las comas dentro de comillas', () => {
+    // "milanesa, papas y ensalada" viene entrecomillado justamente para que
+    // no se lea como tres columnas.
+    const csv = ['nombre,descripcion,precio', 'Milanesa,"con papas, ensalada",8500'].join('\n');
+    const { dishes } = importar(csv);
+
+    expect(dishes[0]?.name).toBe('Milanesa');
+    expect(dishes[0]?.description).toBe('con papas, ensalada');
+  });
+
+  it('asume nombre, precio y categoría cuando no hay encabezados', () => {
+    const csv = ['Empanadas,3400,Entradas', 'Bife,8500,Parrilla'].join('\n');
+    const { dishes, categories } = importar(csv);
+
+    expect(dishes).toHaveLength(2);
+    expect(categories).toEqual(['Entradas', 'Parrilla']);
+  });
+
+  it('agrupa los platos de la misma sección sin repetirla', () => {
+    const csv = [
+      'nombre,precio,categoria',
+      'Empanadas,3400,Entradas',
+      'Provoleta,5200,Entradas',
+      'Bife,8500,Parrilla',
+    ].join('\n');
+    const { dishes, categories } = importar(csv);
+
+    expect(categories).toEqual(['Entradas', 'Parrilla']);
+    expect(dishes.map((d) => d.category)).toEqual(['Entradas', 'Entradas', 'Parrilla']);
+  });
+
+  it('lee los precios escritos como los escribe una planilla', () => {
+    const csv = ['nombre,precio', 'Uno,$8.500', 'Dos,8500', 'Tres,"8.500"'].join('\n');
+    const precios = importar(csv).dishes.map((d) => d.priceMinor);
+
+    expect(precios).toEqual([850_000, 850_000, 850_000]);
+  });
+
+  it('ignora las filas vacías que deja un Excel al final', () => {
+    const csv = ['nombre,precio', 'Flan,2600', ',', '', ';'].join('\n');
+    expect(importar(csv).dishes).toHaveLength(1);
+  });
+
+  it('no devuelve nada con una planilla vacía', () => {
+    expect(csvToMenuText('')).toBe('');
+    expect(importar('').dishes).toEqual([]);
+  });
+
+  it('deja sin sección lo que la planilla no clasifica', () => {
+    const csv = ['nombre,precio', 'Flan,2600'].join('\n');
+    expect(importar(csv).dishes[0]?.category).toBe(DEFAULT_CATEGORY);
   });
 });

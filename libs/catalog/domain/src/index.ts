@@ -37,5 +37,6 @@ export {
   type ParsedLine,
   type ParsedMenu,
   DEFAULT_CATEGORY,
+  csvToMenuText,
   parseMenuText,
 } from './lib/menu-import';
