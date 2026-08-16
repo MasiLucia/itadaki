@@ -141,6 +141,34 @@ const CALL_LABELS: Record<string, string> = {
         </section>
       }
 
+      <!-- Los códigos de las mesas ocupadas. Plegado: sólo hace falta cuando
+           alguien llega tarde y no encuentra a quién pedírselo. -->
+      @if (store.openTables().length > 0) {
+        <section class="block" aria-labelledby="codes-title">
+          <button
+            type="button"
+            class="cooking-toggle"
+            id="codes-title"
+            [attr.aria-expanded]="showCodes()"
+            (click)="showCodes.set(!showCodes())"
+          >
+            <span class="quiet-title">Códigos de mesa</span>
+            <span class="cooking-count">{{ store.openTables().length }} abiertas</span>
+            <span class="cooking-chevron">{{ showCodes() ? '−' : '+' }}</span>
+          </button>
+
+          @if (showCodes()) {
+            @for (mesa of store.openTables(); track mesa.sessionId) {
+              <p class="cooking-row">
+                <span class="table small">Mesa {{ tableNumber(mesa.tableId) }}</span>
+                <span class="cooking-items">{{ mesa.diners }} sentados</span>
+                <span class="join-code">{{ mesa.joinCode ?? 'sin código' }}</span>
+              </p>
+            }
+          }
+        </section>
+      }
+
       <!-- Then the pass: dishes the kitchen has finished and nobody has carried. -->
       <section class="block" aria-labelledby="pickup-title">
         <h2 class="block-title" id="pickup-title">
@@ -239,6 +267,9 @@ export class FloorComponent implements OnDestroy {
 
   /** "En cocina" arranca plegado: es contexto, no trabajo pendiente. */
   protected readonly showCooking = signal(false);
+
+  /** Los códigos también: se miran cuando alguien los pide, no todo el turno. */
+  protected readonly showCodes = signal(false);
 
   /**
    * Qué mesa está esperando confirmación para liberarse.

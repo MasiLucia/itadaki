@@ -76,6 +76,31 @@
   white-space: nowrap;
 }
 
+.join-code-toggle {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--itadaki-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+/* Se dicta en voz alta: dígitos separados y de ancho fijo. */
+.join-code {
+  margin: 0;
+  font-family: var(--itadaki-font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.16em;
+  color: var(--itadaki-ink-strong);
+  white-space: nowrap;
+}
+
 .search-row {
   margin-bottom: 0.75rem;
 }

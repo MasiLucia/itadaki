@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RateLimiter, type RateLimitRule } from '@itadaki/shared/domain';
+import { createHash } from 'node:crypto';
 import { type AuthedRequest } from './auth';
 
 /**
@@ -26,6 +27,17 @@ export const LIMITS = {
    * and throttling real customers mid-order is worse than the abuse it stops.
    */
   diner: { limit: 120, windowMs: 60_000 },
+  /**
+   * Adivinar el código de una mesa.
+   *
+   * Se cuenta por mesa y no por IP, que es lo que importa acá: al atacante le
+   * sobran direcciones, pero el código que quiere romper es de una sola mesa.
+   *
+   * Treinta por minuto deja entrar de golpe a una mesa larga de cumpleaños
+   * —veinte personas escaneando juntas— y al que prueba a ciegas le deja
+   * medio millón de minutos por delante para un código de seis dígitos.
+   */
+  join: { limit: 30, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type LimitName = keyof typeof LIMITS;
@@ -89,6 +101,16 @@ export class RateLimitGuard implements CanActivate {
       const email = typeof body?.email === 'string' ? body.email.toLowerCase() : '';
       return `${name}:${ip}:${email}`;
     }
+
+    // Sentarse en la mesa se cuenta por mesa, sin la IP: quien prueba códigos
+    // a ciegas cambia de dirección cuando quiere, pero no cambia de mesa. El
+    // token identifica una y es lo que hay antes de validar nada.
+    if (name === 'join') {
+      const body = request.body as { tableToken?: unknown } | undefined;
+      const token = typeof body?.tableToken === 'string' ? body.tableToken : '';
+      return `${name}:${createHash('sha256').update(token).digest('base64url')}`;
+    }
+
     return `${name}:${ip}`;
   }
 

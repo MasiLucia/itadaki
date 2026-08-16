@@ -33,6 +33,7 @@ export {
   type SessionError,
   MAX_DINERS,
   openSession,
+  joinCodeAccepted,
   joinSession,
   leaveSession,
   closeSession,

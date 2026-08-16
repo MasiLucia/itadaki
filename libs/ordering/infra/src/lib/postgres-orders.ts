@@ -262,6 +262,8 @@ interface SessionRow {
     modifiers: Array<{ modifierId: string; name: string; priceDelta: MoneyJson }>;
   }>;
   opened_at: string;
+  /** Null en las sesiones abiertas antes de que existiera el código. */
+  join_code: string | null;
 }
 
 export class PostgresSessionStore implements SessionReader, SessionWriter {
@@ -281,6 +283,11 @@ export class PostgresSessionStore implements SessionReader, SessionWriter {
         colorIndex: diner.colorIndex,
         joinedAt: new Date(diner.joinedAt),
       })),
+      // `?? undefined` y no `?? null`: sin migración aplicada la columna ni
+      // viene, y una mesa sin código es una mesa que no lo pide.
+      ...(row.join_code === null || row.join_code === undefined
+        ? {}
+        : { joinCode: row.join_code }),
     };
 
     const lines: CartLine[] = row.cart_lines.map((line) => ({
@@ -443,8 +450,8 @@ export class PostgresSessionStore implements SessionReader, SessionWriter {
   ): Promise<void> {
     await client.query(
       `INSERT INTO table_sessions (tenant_id, id, table_id, status, currency,
-                                   diners, cart_lines, opened_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+                                   diners, cart_lines, opened_at, join_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT (tenant_id, id) DO UPDATE SET
          status = EXCLUDED.status,
          diners = EXCLUDED.diners,
@@ -483,6 +490,9 @@ export class PostgresSessionStore implements SessionReader, SessionWriter {
           })),
         ),
         state.session.openedAt,
+        // El código no se toca en el UPDATE: cambiarlo a mitad de servicio
+        // dejaría afuera a quien lo tiene anotado en la servilleta.
+        state.session.joinCode ?? null,
       ],
     );
   }

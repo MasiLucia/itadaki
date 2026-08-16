@@ -36,4 +36,9 @@ export {
   type SessionFailure,
 } from './lib/session-use-cases';
 export { closeTable, type CloseTableCommand } from './lib/close-table';
-export { listUnsettledTables, type UnsettledTable } from './lib/unsettled-tables';
+export {
+  listUnsettledTables,
+  listOpenTables,
+  type UnsettledTable,
+  type OpenTable,
+} from './lib/unsettled-tables';

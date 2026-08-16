@@ -50,6 +50,15 @@ export interface UnsettledDto {
   readonly diners: number;
 }
 
+/** Una mesa ocupada y su código, para cantárselo al que llega tarde. */
+export interface OpenTableDto {
+  readonly sessionId: string;
+  readonly tableId: string;
+  readonly joinCode: string | null;
+  readonly diners: number;
+  readonly openedAt: string;
+}
+
 /** A dish waiting on the pass, flattened out of its ticket. */
 export interface Pickup {
   readonly orderId: string;
@@ -101,6 +110,7 @@ export class FloorStore {
   });
   readonly tickets = signal<readonly TicketDto[]>([]);
   readonly unsettled = signal<readonly UnsettledDto[]>([]);
+  readonly openTables = signal<readonly OpenTableDto[]>([]);
   readonly connected = signal(false);
 
   /**
@@ -193,10 +203,11 @@ export class FloorStore {
 
   async refresh(): Promise<void> {
     try {
-      const [calls, orders, unsettled] = await Promise.all([
+      const [calls, orders, unsettled, open] = await Promise.all([
         fetch(`${API}/calls`, { headers: this.auth.headers() }),
         fetch(`${API}/orders`, { headers: this.auth.headers() }),
         fetch(`${API}/sessions/unsettled`, { headers: this.auth.headers() }),
+        fetch(`${API}/sessions/open`, { headers: this.auth.headers() }),
       ]);
 
       // A shift long enough to outlive the session ends here rather than
@@ -206,6 +217,7 @@ export class FloorStore {
       if (calls.ok) this.calls.set((await calls.json()) as CallDto[]);
       if (orders.ok) this.tickets.set((await orders.json()) as TicketDto[]);
       if (unsettled.ok) this.unsettled.set((await unsettled.json()) as UnsettledDto[]);
+      if (open.ok) this.openTables.set((await open.json()) as OpenTableDto[]);
     } catch {
       // Keep the last known room; the next event or reconnect retries.
     }

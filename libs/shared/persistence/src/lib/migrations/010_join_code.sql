@@ -1,0 +1,14 @@
+-- El código que hay que decir para sentarse en una mesa ya abierta.
+--
+-- El QR impreso no vence nunca — es a propósito, el sticker de la mesa tiene
+-- que seguir sirviendo el mes que viene. Pero eso hace que una foto del QR
+-- valga para siempre y desde cualquier lado: quien la tenga se suma a la mesa
+-- desde su casa y pide a cuenta de otro.
+--
+-- El código cierra esa puerta sin tocar el QR: nace con la sesión, sólo lo ve
+-- quien ya está sentado o el mozo, y desaparece cuando la mesa se cierra.
+--
+-- Nullable a propósito: las sesiones abiertas antes de esta migración no lo
+-- tienen, y hacerlas obligatorio dejaría a esas mesas sin poder sumar a nadie
+-- en el medio de un servicio. Se piden códigos donde hay código.
+ALTER TABLE table_sessions ADD COLUMN IF NOT EXISTS join_code text;

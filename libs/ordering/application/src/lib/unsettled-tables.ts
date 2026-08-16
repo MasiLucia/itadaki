@@ -10,6 +10,41 @@ import {
 import { type OrderReader, type OrderRepositoryError } from './ports';
 import { type SessionReader } from './session-ports';
 
+/** Una mesa ocupada, con lo que el salón necesita saber de ella. */
+export interface OpenTable {
+  readonly sessionId: string;
+  readonly tableId: string;
+  /** Para cantárselo a quien llega tarde y no puede sentarse. */
+  readonly joinCode: string | null;
+  readonly diners: number;
+  readonly openedAt: Date;
+}
+
+/**
+ * Las mesas ocupadas ahora, con su código.
+ *
+ * El código sólo lo conoce quien ya está sentado, y eso deja afuera al que
+ * llega media hora después: alguien tiene que poder decírselo. Va detrás de un
+ * permiso de personal, nunca del token de la mesa — que es justamente lo que
+ * el código protege.
+ */
+export function listOpenTables(deps: { sessions: SessionReader }) {
+  return async (tenantId: string): Promise<Result<readonly OpenTable[], OrderRepositoryError>> => {
+    const open = await deps.sessions.listOpen(tenantId);
+    if (open.isErr()) return err(open.error);
+
+    return ok(
+      open.value.map((state) => ({
+        sessionId: state.session.id,
+        tableId: state.session.tableId,
+        joinCode: state.session.joinCode ?? null,
+        diners: state.session.diners.length,
+        openedAt: state.session.openedAt,
+      })),
+    );
+  };
+}
+
 /** Una mesa que ya comió todo y sigue con la cuenta abierta. */
 export interface UnsettledTable {
   readonly sessionId: string;

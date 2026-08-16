@@ -285,6 +285,18 @@
   flex-shrink: 0;
 }
 
+/* Se dicta en voz alta cruzando el salón: grande y con los dígitos separados. */
+.join-code {
+  margin-left: auto;
+  font-family: var(--itadaki-font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.14em;
+  color: var(--itadaki-ink-strong);
+  white-space: nowrap;
+}
+
 .quiet {
   font-size: 0.85rem;
   color: var(--itadaki-ink-subtle);

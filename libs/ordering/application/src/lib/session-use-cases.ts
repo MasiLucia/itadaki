@@ -4,6 +4,7 @@ import {
   addLine,
   canModify,
   emptyCart,
+  joinCodeAccepted,
   joinSession,
   leaveSession,
   openSession,
@@ -25,6 +26,7 @@ export type SessionFailure =
   | { readonly kind: 'NICKNAME_TAKEN'; readonly nickname: string }
   | { readonly kind: 'INVALID_NICKNAME'; readonly nickname: string }
   | { readonly kind: 'TABLE_FULL'; readonly limit: number }
+  | { readonly kind: 'WRONG_JOIN_CODE' }
   | { readonly kind: 'DINER_NOT_FOUND'; readonly dinerId: string }
   | { readonly kind: 'NOT_YOUR_LINE'; readonly lineId: string };
 
@@ -35,6 +37,8 @@ export interface JoinTableCommand {
   readonly currency: CurrencyCode;
   /** Quien vuelve a la misma mesa; ausente la primera vez. */
   readonly dinerId?: string | undefined;
+  /** El código de la mesa, que hace falta desde el segundo comensal. */
+  readonly joinCode?: string | undefined;
 }
 
 export interface JoinResult {
@@ -53,12 +57,18 @@ export function joinTable(deps: {
   events: SessionEventPublisher;
   newId: () => string;
   now: () => Date;
+  /** El código que se le pone a una mesa recién abierta. */
+  newJoinCode?: () => string;
 }) {
   return async (command: JoinTableCommand): Promise<Result<JoinResult, SessionFailure>> => {
     const existing = await deps.sessions.findOpenForTable(command.tenantId, command.tableId);
     if (existing.isErr()) {
       return err(existing.error);
     }
+
+    // Mesa recién abierta: el código que se le acaba de poner no se le puede
+    // exigir a quien la abrió, que es la persona que lo va a decir después.
+    const abreLaMesa = existing.value === null;
 
     const state: SessionState =
       existing.value ??
@@ -69,6 +79,7 @@ export function joinTable(deps: {
           tableId: command.tableId,
           currency: command.currency,
           at: deps.now(),
+          ...(deps.newJoinCode === undefined ? {} : { joinCode: deps.newJoinCode() }),
         }),
         cart: emptyCart(command.currency),
       };
@@ -79,6 +90,12 @@ export function joinTable(deps: {
     const vuelve =
       command.dinerId !== undefined &&
       state.session.diners.some((diner) => diner.id === command.dinerId);
+
+    // El código lo piden los que llegan a una mesa en curso. No quien la abre,
+    // ni quien vuelve del baño con la batería agotada: esa ya está sentada.
+    if (!abreLaMesa && !vuelve && !joinCodeAccepted(state.session, command.joinCode)) {
+      return err({ kind: 'WRONG_JOIN_CODE' });
+    }
 
     const dinerId = vuelve && command.dinerId !== undefined ? command.dinerId : deps.newId();
     const joined = joinSession(state.session, {

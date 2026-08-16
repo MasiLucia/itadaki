@@ -58,6 +58,18 @@ export class SessionStore {
   readonly connected = signal(false);
   readonly joinError = signal<string | null>(null);
 
+  /** La mesa ya estaba abierta y hace falta su código para sentarse. */
+  readonly needsCode = signal(false);
+
+  /**
+   * El código de esta mesa, para poder decírselo a quien llega después.
+   *
+   * Sólo lo tiene quien ya entró: la API lo manda una vez, al unirse, y nunca
+   * en la lectura de la sesión — esa está detrás del token de la mesa, que es
+   * exactamente lo que el código protege.
+   */
+  readonly joinCode = signal<string | null>(null);
+
   readonly isJoined = computed(() => this.session() !== null && this.myDinerId() !== null);
 
   /**
@@ -106,8 +118,13 @@ export class SessionStore {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw === null) return;
-      const saved = JSON.parse(raw) as { sessionId: string; dinerId: string };
+      const saved = JSON.parse(raw) as {
+        sessionId: string;
+        dinerId: string;
+        joinCode?: string | null;
+      };
       this.myDinerId.set(saved.dinerId);
+      this.joinCode.set(saved.joinCode ?? null);
 
       void this.refresh(saved.sessionId).then(() => {
         // A meal that already ended is not worth rejoining: restoring it puts
@@ -138,7 +155,7 @@ export class SessionStore {
     this.api.unblock();
   }
 
-  async join(nickname: string): Promise<boolean> {
+  async join(nickname: string, joinCode?: string): Promise<boolean> {
     this.joinError.set(null);
     // Scanning a fresh QR is the way out of an expired or settled table.
     this.api.unblock();
@@ -158,10 +175,24 @@ export class SessionStore {
       tableToken,
       nickname,
       ...(anterior === null ? {} : { dinerId: anterior }),
+      ...(joinCode === undefined || joinCode === '' ? {} : { joinCode }),
     });
 
     if (!response.ok) {
       const detail = (await response.json().catch(() => null)) as { kind?: string } | null;
+
+      // La mesa ya está abierta y pide su código. No es un error de la persona
+      // la primera vez: nadie le dijo todavía que hacía falta uno.
+      if (detail?.kind === 'WRONG_JOIN_CODE') {
+        this.needsCode.set(true);
+        this.joinError.set(
+          joinCode === undefined || joinCode === ''
+            ? 'Pedile el código de la mesa a quien ya está sentado, o al mozo'
+            : 'Ese código no es el de esta mesa',
+        );
+        return false;
+      }
+
       this.joinError.set(
         detail?.kind === 'NICKNAME_TAKEN'
           ? 'Ese nombre ya está en la mesa — probá otro'
@@ -174,12 +205,24 @@ export class SessionStore {
       return false;
     }
 
-    const created = (await response.json()) as { dinerId: string; session: SessionDto };
+    const created = (await response.json()) as {
+      dinerId: string;
+      session: SessionDto;
+      joinCode: string | null;
+    };
     this.myDinerId.set(created.dinerId);
     this.session.set(created.session);
+    this.needsCode.set(false);
+    this.joinCode.set(created.joinCode);
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ sessionId: created.session.id, dinerId: created.dinerId }),
+      JSON.stringify({
+        sessionId: created.session.id,
+        dinerId: created.dinerId,
+        // Guardado para que recargar no lo pierda: es lo que esta persona le
+        // dice al que llega tarde, y la API sólo lo manda al entrar.
+        joinCode: created.joinCode,
+      }),
     );
 
     this.listen(created.session.id);

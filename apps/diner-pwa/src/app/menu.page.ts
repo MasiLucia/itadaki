@@ -58,6 +58,19 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
               {{ dinerCount() }} en la mesa
               @if (session.connected()) { · en vivo }
             </p>
+
+            <!-- Para el que llega tarde: sin esto tiene que ir a buscar al
+                 mozo, cuando la persona que lo puede ayudar está sentada al
+                 lado. Se muestra a pedido y no siempre, que es un código. -->
+            @if (session.joinCode(); as code) {
+              @if (showCode()) {
+                <p class="join-code">{{ code }}</p>
+              } @else {
+                <button type="button" class="join-code-toggle" (click)="showCode.set(true)">
+                  Ver código de la mesa
+                </button>
+              }
+            }
           </aside>
         }
       </div>
@@ -267,6 +280,9 @@ export class MenuPage {
   protected readonly cart = inject(CartStore);
   protected readonly session = inject(SessionStore);
   protected readonly adding = signal<string | null>(null);
+
+  /** El código queda tapado hasta que alguien lo pide, como cualquier código. */
+  protected readonly showCode = signal(false);
 
   /** Qué plato tiene la indicación abierta: uno a la vez. */
   protected readonly noting = signal<string | null>(null);

@@ -14,10 +14,12 @@ import {
   joinTable,
   closeTable,
   leaveTable,
+  listOpenTables,
   listUnsettledTables,
   type SessionState,
 } from '@itadaki/ordering/application';
 import { groupByDiner } from '@itadaki/ordering/domain';
+import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 import {
   type DinerScope,
@@ -46,7 +48,25 @@ const joinSchema = z.object({
    * da acceso a nada, porque se compara contra los que ya están en la mesa.
    */
   dinerId: z.string().min(1).max(64).optional(),
+  /** El código de la mesa; hace falta desde el segundo comensal. */
+  joinCode: z.string().min(1).max(8).optional(),
 });
+
+/**
+ * El código que se le pone a una mesa recién abierta.
+ *
+ * Seis dígitos y no cuatro. Cuatro se dicen más fácil en una mesa ruidosa,
+ * pero son diez mil combinaciones: con el límite de intentos puesto, alguien
+ * que ataca una mesa las agota en poco más de una hora, y una sobremesa dura
+ * eso. Con seis hacen falta días, y la mesa cierra mucho antes. Es el mismo
+ * largo que cualquier código que llega por SMS, así que nadie se sorprende.
+ *
+ * `randomInt` y no `Math.random()`: esto es control de acceso, y el generador
+ * de siempre es predecible si se llegan a ver algunos códigos.
+ */
+function newJoinCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, '0');
+}
 
 const addSchema = z.object({
   dinerId: z.string().min(1).max(64),
@@ -172,9 +192,33 @@ export class SessionsController {
     }));
   }
 
+  /**
+   * Las mesas ocupadas y su código, para el salón.
+   *
+   * Detrás de `orders:advance`, nunca del token de la mesa: el código existe
+   * justamente para que una foto del QR no alcance, así que servirlo a quien
+   * presenta ese QR lo volvería inútil.
+   */
+  @RequirePermission('orders:advance')
+  @Get('open')
+  async open(@TenantId() tenantId: string) {
+    const result = await listOpenTables({ sessions: this.sessions.store })(tenantId);
+    if (result.isErr()) {
+      throw new HttpException(result.error, HttpStatus.BAD_GATEWAY);
+    }
+
+    return result.value.map((table) => ({
+      sessionId: table.sessionId,
+      tableId: table.tableId,
+      joinCode: table.joinCode,
+      diners: table.diners,
+      openedAt: table.openedAt.toISOString(),
+    }));
+  }
+
   /** Joins the table's open session, creating it if this is the first diner. */
   @Public()
-  @RateLimit('diner')
+  @RateLimit('join')
   @Post('join')
   async join(@Body() body: unknown) {
     const parsed = joinSchema.safeParse(body);
@@ -194,6 +238,7 @@ export class SessionsController {
       events: this.realtime,
       newId: () => crypto.randomUUID(),
       now: () => new Date(),
+      newJoinCode,
     });
 
     const result = await run({
@@ -202,14 +247,28 @@ export class SessionsController {
       nickname: parsed.data.nickname,
       currency: 'ARS',
       ...(parsed.data.dinerId === undefined ? {} : { dinerId: parsed.data.dinerId }),
+      ...(parsed.data.joinCode === undefined ? {} : { joinCode: parsed.data.joinCode }),
     });
 
     if (result.isErr()) {
+      // 403 y no 400: el pedido está bien formado, lo que falta es permiso
+      // para sentarse. El teléfono lo distingue para pedir el código.
+      if (result.error.kind === 'WRONG_JOIN_CODE') {
+        throw new HttpException(result.error, HttpStatus.FORBIDDEN);
+      }
       const status = result.error.kind === 'NICKNAME_TAKEN' ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST;
       throw new HttpException(result.error, status);
     }
 
-    return { dinerId: result.value.dinerId, session: toSessionDto(result.value.state) };
+    // El código viaja sólo acá, en la respuesta a quien acaba de entrar, y
+    // nunca en el DTO de la sesión: `GET /sessions/:id` está detrás del token
+    // de la mesa, así que incluirlo ahí se lo regalaría a la misma foto del QR
+    // de la que estamos defendiendo la mesa.
+    return {
+      dinerId: result.value.dinerId,
+      session: toSessionDto(result.value.state),
+      joinCode: result.value.state.session.joinCode ?? null,
+    };
   }
 
   @Public()

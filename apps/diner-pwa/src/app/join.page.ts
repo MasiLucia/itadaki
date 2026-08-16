@@ -44,6 +44,26 @@ const SUGGESTIONS = ['Ana', 'Beto', 'Cami', 'Dani', 'Eli', 'Fede', 'Gaby', 'Nico
           }
         </div>
 
+        <!-- Aparece recién cuando la mesa lo pide, no de entrada: el primero
+             que se sienta abre la mesa y no tiene a quién pedirle un código. -->
+        @if (store.needsCode()) {
+          <label class="code-label" for="join-code">Código de la mesa</label>
+          <p class="code-hint">
+            Se lo decís a quien ya está sentado, o se lo pedís al mozo.
+          </p>
+          <input
+            id="join-code"
+            class="input code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            placeholder="000000"
+            [value]="code()"
+            (input)="onCode($event)"
+          />
+        }
+
         @if (store.joinError(); as error) {
           <p class="error" role="alert">{{ error }}</p>
         }
@@ -62,10 +82,16 @@ export class JoinPage {
 
   protected readonly suggestions = SUGGESTIONS;
   protected readonly nickname = signal('');
+  protected readonly code = signal('');
   protected readonly busy = signal(false);
 
   protected onInput(event: Event): void {
     this.nickname.set((event.target as HTMLInputElement).value);
+  }
+
+  /** Sólo dígitos: quien lo dicta a veces lo separa, "12 34 56". */
+  protected onCode(event: Event): void {
+    this.code.set((event.target as HTMLInputElement).value.replace(/\D/g, ''));
   }
 
   protected pick(name: string): void {
@@ -77,7 +103,7 @@ export class JoinPage {
     if (this.busy()) return;
 
     this.busy.set(true);
-    const joined = await this.store.join(this.nickname().trim());
+    const joined = await this.store.join(this.nickname().trim(), this.code());
     this.busy.set(false);
 
     if (joined) {
