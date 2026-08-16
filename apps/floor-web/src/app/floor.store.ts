@@ -36,6 +36,20 @@ export interface TicketDto {
   readonly placedAt: string | null;
 }
 
+/**
+ * Una mesa que ya comió todo y sigue con la cuenta abierta.
+ *
+ * No sale del tablero de cocina: justamente son las que ya no tienen nada en
+ * cocina, así que hasta ahora desaparecían de la pantalla del mozo.
+ */
+export interface UnsettledDto {
+  readonly sessionId: string;
+  readonly tableId: string;
+  readonly owed: { readonly amountInMinorUnits: number; readonly currency: string };
+  readonly since: string | null;
+  readonly diners: number;
+}
+
 /** A dish waiting on the pass, flattened out of its ticket. */
 export interface Pickup {
   readonly orderId: string;
@@ -86,6 +100,7 @@ export class FloorStore {
     onOffline: () => this.connected.set(false),
   });
   readonly tickets = signal<readonly TicketDto[]>([]);
+  readonly unsettled = signal<readonly UnsettledDto[]>([]);
   readonly connected = signal(false);
 
   /**
@@ -178,9 +193,10 @@ export class FloorStore {
 
   async refresh(): Promise<void> {
     try {
-      const [calls, orders] = await Promise.all([
+      const [calls, orders, unsettled] = await Promise.all([
         fetch(`${API}/calls`, { headers: this.auth.headers() }),
         fetch(`${API}/orders`, { headers: this.auth.headers() }),
+        fetch(`${API}/sessions/unsettled`, { headers: this.auth.headers() }),
       ]);
 
       // A shift long enough to outlive the session ends here rather than
@@ -189,6 +205,7 @@ export class FloorStore {
 
       if (calls.ok) this.calls.set((await calls.json()) as CallDto[]);
       if (orders.ok) this.tickets.set((await orders.json()) as TicketDto[]);
+      if (unsettled.ok) this.unsettled.set((await unsettled.json()) as UnsettledDto[]);
     } catch {
       // Keep the last known room; the next event or reconnect retries.
     }

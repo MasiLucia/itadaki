@@ -232,6 +232,39 @@
   flex-shrink: 0;
 }
 
+/* Plata que se puede ir caminando: se lee de un vistazo desde lejos. */
+.count.owed {
+  background: var(--itadaki-status-late);
+}
+
+.card.owing-card {
+  border-left: 5px solid var(--itadaki-status-late);
+}
+
+.amount {
+  font-family: var(--itadaki-font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--itadaki-ink);
+}
+
+/* Liberar debiendo se confirma en dos toques, con el monto en el botón: es
+   lo último que ve el mozo antes de que la mesa deje de existir. */
+.owing-card .release.confirm {
+  background: var(--itadaki-status-late);
+  color: white;
+  border: none;
+  border-radius: var(--itadaki-radius-pill);
+  padding: 0.6rem 1rem;
+  font-family: var(--itadaki-font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+
 .quiet {
   font-size: 0.85rem;
   color: var(--itadaki-ink-subtle);

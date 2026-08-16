@@ -90,6 +90,52 @@ const CALL_LABELS: Record<string, string> = {
         }
       </section>
 
+      <!-- Mesas que ya comieron todo y no pagaron. Sólo aparece cuando hay:
+           es una alerta, no una vista. Sin esto la mesa salía del tablero al
+           entregarse el último plato y el mozo no tenía dónde verla. -->
+      @if (store.unsettled().length > 0) {
+        <section class="block owing" aria-labelledby="owing-title">
+          <h2 class="block-title" id="owing-title">
+            Sin cobrar
+            <span class="count owed">{{ store.unsettled().length }}</span>
+          </h2>
+
+          @for (mesa of store.unsettled(); track mesa.sessionId) {
+            <article class="card owing-card">
+              <div class="card-main">
+                <span class="table">Mesa {{ tableNumber(mesa.tableId) }}</span>
+                <span class="amount">{{ money(mesa.owed) }}</span>
+                <span class="note">{{ mesa.diners }} en la mesa</span>
+              </div>
+              <div class="card-side">
+                @if (mesa.since !== null) {
+                  <span class="waited">comieron {{ waitedSince(mesa.since) }}</span>
+                }
+                <!-- Muestra lo que debe en la confirmación y libera igual:
+                     mucha gente paga en la caja, y el mozo es el que sabe. -->
+                @if (confirming() === mesa.sessionId) {
+                  <button
+                    type="button"
+                    class="release confirm"
+                    (click)="release(mesa.sessionId)"
+                  >
+                    Debe {{ money(mesa.owed) }} · liberar igual
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    class="action"
+                    (click)="confirming.set(mesa.sessionId)"
+                  >
+                    Liberar
+                  </button>
+                }
+              </div>
+            </article>
+          }
+        </section>
+      }
+
       <!-- Then the pass: dishes the kitchen has finished and nobody has carried. -->
       <section class="block" aria-labelledby="pickup-title">
         <h2 class="block-title" id="pickup-title">
@@ -238,6 +284,15 @@ export class FloorComponent implements OnDestroy {
   protected waitedSince(raisedAt: string): string {
     const minutes = Math.floor((this.tick() - new Date(raisedAt).getTime()) / 60_000);
     return minutes < 1 ? 'recién' : `hace ${minutes} min`;
+  }
+
+  /** El monto como lo lee un mozo cruzando el salón: sin centavos. */
+  protected money(amount: { amountInMinorUnits: number; currency: string }): string {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: amount.currency,
+      maximumFractionDigits: 0,
+    }).format(amount.amountInMinorUnits / 100);
   }
 
   protected pending(items: readonly { name: string; quantity: number; status: string }[]): string {
