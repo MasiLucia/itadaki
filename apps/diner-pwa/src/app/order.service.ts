@@ -115,4 +115,18 @@ export class OrderService {
   reset(): void {
     this.state.set({ kind: 'idle' });
   }
+
+  /**
+   * No hay mesa a la que mandarle el pedido.
+   *
+   * Pasa con el carrito local de quien miró la carta sin escanear el QR: el
+   * pedido está armado pero no pertenece a ninguna sesión, y la cocina no
+   * tendría a qué mesa llevarlo.
+   */
+  needsTable(): void {
+    this.state.set({
+      kind: 'failed',
+      message: 'escaneá el QR de tu mesa para enviar el pedido',
+    });
+  }
 }

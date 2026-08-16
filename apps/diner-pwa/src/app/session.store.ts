@@ -59,6 +59,26 @@ export class SessionStore {
   readonly joinError = signal<string | null>(null);
 
   readonly isJoined = computed(() => this.session() !== null && this.myDinerId() !== null);
+
+  /**
+   * El número de la mesa como está impreso en el cartelito, o `null`.
+   *
+   * Acá y no en cada pantalla: la carta, el carrito, el estado y la cuenta lo
+   * muestran en su cabecera, y hasta ahora las cuatro decían "mesa 07" escrito
+   * a mano. En un salón real cada teléfono está en una mesa distinta.
+   *
+   * `null` mientras no haya sesión: no se sabe la mesa hasta escanear el QR, y
+   * mostrar cualquier número inventado es peor que no mostrar ninguno.
+   */
+  readonly tableLabel = computed(() => {
+    const tableId = this.session()?.tableId;
+    // El id viaja como "mesa-01"; del cartel sólo cuelga el número.
+    if (tableId !== undefined) return /(\d+)\s*$/.exec(tableId)?.[1] ?? tableId;
+
+    // Sin sesión todavía, el QR ya trae la mesa: así la primera pantalla
+    // saluda con el número correcto en vez de esperar a que alguien se una.
+    return this.table.tableLabel();
+  });
   readonly others = computed(() =>
     (this.session()?.diners ?? []).filter((diner) => diner.id !== this.myDinerId()),
   );

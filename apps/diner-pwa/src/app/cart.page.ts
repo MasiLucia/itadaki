@@ -19,7 +19,11 @@ import { OrderService } from './order.service';
     <header class="pad">
       <itd-back to="/carta" label="la carta" />
       <p class="eyebrow">
-        @if (session.isJoined()) { mesa 07 · pedido compartido } @else { tu pedido }
+        @if (session.tableLabel(); as mesa) {
+          mesa {{ mesa }} · pedido compartido
+        } @else {
+          tu pedido
+        }
       </p>
       <h1 class="title">carrito</h1>
       @if (session.isJoined() && session.connected()) {
@@ -357,8 +361,26 @@ export class CartPage {
     this.orders.reset();
   }
 
+  /**
+   * Envío desde el carrito local, el de quien todavía no se unió a la mesa.
+   *
+   * La sesión y el comensal salen del store: antes iban escritos a mano como
+   * "mesa-07" / "me", que sólo funcionaba con la mesa de demostración — en
+   * cualquier otra el servidor no encuentra esa sesión y el pedido se pierde.
+   *
+   * Sin sesión no hay a dónde mandarlo, y decirlo es mejor que un POST que la
+   * API va a rechazar: el plato no llega a la cocina en ninguno de los dos
+   * casos, pero así la persona se entera antes de quedarse esperando.
+   */
   protected async send(): Promise<void> {
-    await this.orders.submit(this.cart.cart(), 'mesa-07', 'me');
+    const sessionId = this.session.session()?.id;
+    const dinerId = this.session.myDinerId();
+    if (sessionId === undefined || dinerId === null) {
+      this.orders.needsTable();
+      return;
+    }
+
+    await this.orders.submit(this.cart.cart(), sessionId, dinerId);
   }
 
   protected startNew(): void {

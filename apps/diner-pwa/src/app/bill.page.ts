@@ -30,7 +30,9 @@ const CURRENCIES = ['ARS', 'USD', 'EUR', 'BRL'] as const;
   template: `
     <header class="pad">
       <itd-back to="/carta" label="la carta" />
-      <p class="eyebrow">mesa 07 · cuenta</p>
+      <p class="eyebrow">
+        @if (session.tableLabel(); as mesa) { mesa {{ mesa }} · }cuenta
+      </p>
       <h1 class="title">gochisousama!</h1>
     </header>
 

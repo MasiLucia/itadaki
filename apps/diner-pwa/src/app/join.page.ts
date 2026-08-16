@@ -17,7 +17,9 @@ const SUGGESTIONS = ['Ana', 'Beto', 'Cami', 'Dani', 'Eli', 'Fede', 'Gaby', 'Nico
           Escaneá el QR de tu mesa para poder pedir. Podés ver la carta igual.
         </p>
       }
-      <p class="table">Tu mesa</p>
+      <p class="table">
+        @if (table.tableLabel(); as mesa) { Mesa {{ mesa }} } @else { Tu mesa }
+      </p>
       <h1 class="title">¿Cómo te llamamos?</h1>
       <p class="lede">
         Elegí un nombre para que el resto de la mesa vea qué pediste. No pedimos mail ni cuenta.

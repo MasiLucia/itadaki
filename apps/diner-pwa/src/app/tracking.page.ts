@@ -28,7 +28,7 @@ const STEP_LABELS: Record<string, { title: string; hint: string }> = {
     <header class="pad">
       <itd-back to="/carta" label="la carta" />
       <p class="eyebrow">
-        mesa 07 · estado
+        @if (session.tableLabel(); as mesa) { mesa {{ mesa }} · }estado
         @if (session.connected()) {
           <span class="live"><span class="live-dot" aria-hidden="true"></span>en vivo</span>
         }

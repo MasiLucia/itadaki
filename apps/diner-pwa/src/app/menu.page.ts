@@ -32,7 +32,7 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
 
         @if (session.isJoined()) {
           <aside class="table-tag" aria-label="Mesa y comensales">
-            <p class="table-tag-name">Mesa {{ tableLabel() }}</p>
+            <p class="table-tag-name">Mesa {{ session.tableLabel() }}</p>
 
             <div class="table-tag-diners">
               @for (diner of session.session()?.diners ?? []; track diner.id) {
@@ -331,18 +331,6 @@ export class MenuPage {
   protected readonly activeCategory = signal<string | null>(null);
   protected readonly activeDiets = signal<readonly DietTag[]>([]);
   protected readonly search = signal('');
-
-  /**
-   * El número de la mesa real, no uno de muestra.
-   *
-   * Sale de la sesión, que es lo único que sabe en qué mesa está este teléfono:
-   * el id viene como "mesa-01", y de ahí se muestran sólo los dígitos, que es
-   * lo que está impreso en el cartelito de la mesa.
-   */
-  protected readonly tableLabel = computed(() => {
-    const tableId = this.session.session()?.tableId ?? '';
-    return /(\d+)\s*$/.exec(tableId)?.[1] ?? tableId;
-  });
 
   protected readonly dinerCount = computed(() => (this.session.session()?.diners ?? []).length);
 
