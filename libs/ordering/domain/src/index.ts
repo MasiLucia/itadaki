@@ -77,3 +77,4 @@ export {
   LIST_BELOW,
   TABS_BELOW,
 } from './lib/table-board';
+export { placedTotals } from './lib/placed-totals';

@@ -26,6 +26,8 @@ export interface SessionSubtotal {
   readonly nickname: string;
   readonly colorIndex: number;
   readonly subtotal: { amountInMinorUnits: number; currency: string };
+  /** Lo que esta persona ya mandó a la cocina, aparte de su carrito. */
+  readonly placed?: { amountInMinorUnits: number; currency: string };
 }
 
 export interface SessionDto {
@@ -36,6 +38,13 @@ export interface SessionDto {
   readonly diners: readonly SessionDiner[];
   readonly lines: readonly SessionLine[];
   readonly subtotals: readonly SessionSubtotal[];
+  /**
+   * El consumo acumulado de la mesa: lo que ya fue a la cocina.
+   *
+   * Aparte del carrito a propósito — el carrito es lo que se está armando y
+   * se vacía al enviar; esto es lo que la mesa ya debe.
+   */
+  readonly placedTotal?: { amountInMinorUnits: number; currency: string };
 }
 
 const STORAGE_KEY = 'itadaki.session';

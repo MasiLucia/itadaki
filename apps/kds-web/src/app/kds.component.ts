@@ -29,7 +29,15 @@ const COLUMNS: readonly Column[] = [
   { status: 'SENT', label: 'nuevo', next: 'ACCEPTED', action: 'aceptar' },
   { status: 'ACCEPTED', label: 'aceptado', next: 'IN_PREP', action: 'empezar' },
   { status: 'IN_PREP', label: 'en preparación', next: 'READY', action: 'marcar listo' },
-  { status: 'READY', label: 'listo para servir', next: 'DELIVERED', action: 'entregado' },
+  /*
+   * La cocina llega hasta acá y no más.
+   *
+   * Marcar "entregado" desde la cocina daba por servido un plato que todavía
+   * está en la barra: el mozo lo perdía de su lista antes de llevarlo, y la
+   * mesa figuraba servida sin que nadie hubiera caminado hasta ella. Quien
+   * entrega es quien lo declara, desde el salón.
+   */
+  { status: 'READY', label: 'listo para servir', next: null, action: 'esperando al mozo' },
 ];
 
 const STATIONS: ReadonlyArray<{ id: string; label: string }> = [
@@ -156,7 +164,9 @@ const SLA_LATE = 15;
                             {{ step.action }}
                           </button>
                         } @else {
-                          <span class="item-done">entregado</span>
+                          <!-- READY no es entregado: el plato está en la
+                               barra esperando que el mozo lo lleve. -->
+                          <span class="item-done">{{ doneLabel(item.status) }}</span>
                         }
                       </span>
                     </li>
@@ -540,6 +550,11 @@ export class KdsComponent implements OnDestroy {
    * falls back to a short prefix so the ticket is still identifiable.
    */
   /** The one step a dish can take from where it is, or null once delivered. */
+  /** Qué decir de un plato que ya no tiene botón en este tablero. */
+  protected doneLabel(status: string): string {
+    return status === 'READY' ? 'en la barra' : 'entregado';
+  }
+
   protected nextFor(status: string): { next: string; action: string } | null {
     const step = COLUMNS.find((column) => column.status === status);
     return step?.next === null || step === undefined

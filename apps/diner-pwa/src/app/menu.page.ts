@@ -251,7 +251,10 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
       }
     </main>
 
-    @if (sharedCount() > 0) {
+    <!-- También con el carrito vacío, si la mesa ya pidió: enviar a la
+         cocina no borra lo consumido, y el pie es por dónde se llega a la
+         cuenta y al estado del pedido. -->
+    @if (sharedCount() > 0 || tableHasConsumed()) {
       <footer class="foot">
         <a class="cta" routerLink="/carrito">
           <!-- Sin el número suelto: "Ver pedido de la mesa · 3" se leía como
@@ -442,20 +445,33 @@ export class MenuPage {
     this.search.set('');
   }
 
+  /** Si la mesa ya mandó algo a la cocina, aunque el carrito esté vacío. */
+  protected readonly tableHasConsumed = computed(
+    () => (this.session.session()?.placedTotal?.amountInMinorUnits ?? 0) > 0,
+  );
+
   protected readonly sharedCount = computed(() => {
     const current = this.session.session();
     if (current === null) return this.cart.count();
     return current.lines.reduce((total, line) => total + line.quantity, 0);
   });
 
+  /**
+   * Lo que la mesa lleva consumido: el carrito más lo ya enviado a la cocina.
+   *
+   * Antes sumaba sólo el carrito, así que apenas la mesa mandaba el pedido el
+   * pie mostraba $0 — justo cuando más plata debe. Carrito vacío no es mesa
+   * sin consumo.
+   */
   protected readonly sharedTotalLabel = computed(() => {
     const current = this.session.session();
     if (current === null) return this.cart.total().toString();
 
-    const minor = current.subtotals.reduce(
+    const enCarrito = current.subtotals.reduce(
       (total, entry) => total + entry.subtotal.amountInMinorUnits,
       0,
     );
+    const minor = enCarrito + (current.placedTotal?.amountInMinorUnits ?? 0);
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
       currency: current.currency,

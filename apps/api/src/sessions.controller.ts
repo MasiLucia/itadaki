@@ -18,7 +18,8 @@ import {
   listUnsettledTables,
   type SessionState,
 } from '@itadaki/ordering/application';
-import { groupByDiner } from '@itadaki/ordering/domain';
+import { type Order, groupByDiner, placedTotals } from '@itadaki/ordering/domain';
+import { Money } from '@itadaki/shared/domain';
 import { PostgresTableStore, TABLE_TOKEN_HOURS, signTableToken } from '@itadaki/identity/infra';
 import { type PostgresInviteStore } from '@itadaki/ordering/infra';
 import { z } from 'zod';
@@ -84,8 +85,9 @@ const changeSchema = z.object({
   quantity: z.number().int().min(0).max(99),
 });
 
-function toSessionDto(state: SessionState) {
+function toSessionDto(state: SessionState, placed: readonly Order[] = []) {
   const groups = groupByDiner(state.session, state.cart);
+  const enviado = placedTotals(placed, state.session.currency);
 
   return {
     id: state.session.id,
@@ -115,7 +117,17 @@ function toSessionDto(state: SessionState) {
       nickname: group.diner.nickname,
       colorIndex: group.diner.colorIndex,
       subtotal: toMoneyDto(group.subtotal),
+      /** Lo que esta persona ya mandó a la cocina, aparte de su carrito. */
+      placed: toMoneyDto(enviado.porComensal.get(group.diner.id) ?? Money.zero(state.session.currency)),
     })),
+    /**
+     * El consumo acumulado de la mesa: lo enviado a la cocina.
+     *
+     * Separado de `subtotals` a propósito. El carrito es lo que se está
+     * armando; esto es lo que la mesa ya debe. Sumarlos en un solo número
+     * haría que un plato contara dos veces mientras está en ambos lados.
+     */
+    placedTotal: toMoneyDto(enviado.total),
   };
 }
 
@@ -461,11 +473,21 @@ export class SessionsController {
     };
   }
 
+  /** Lo que la mesa ya mandó a la cocina; vacío si la consulta falla. */
+  private async placedFor(tenantId: string, sessionId: string): Promise<readonly Order[]> {
+    const placed = await this.orders.store.listBySession(tenantId, sessionId);
+    return placed.isOk() ? placed.value : [];
+  }
+
   @Public()
   @TableScoped()
   @Get(':id')
   async read(@Param('id') sessionId: string, @Scope() scope: DinerScope) {
-    return toSessionDto(await this.sessionInScope(scope, sessionId));
+    const state = await this.sessionInScope(scope, sessionId);
+
+    // Con lo ya enviado a la cocina: el carrito se vacía al mandar el pedido,
+    // y sin esto la mesa mostraba $0 justo cuando más plata debe.
+    return toSessionDto(state, await this.placedFor(scope.tenantId, sessionId));
   }
 
   /**
@@ -558,7 +580,9 @@ export class SessionsController {
     if (result.isErr()) {
       throw new HttpException(result.error, HttpStatus.CONFLICT);
     }
-    return toSessionDto(result.value);
+    // Con lo ya enviado: tocar el carrito no cambia lo que la mesa
+    // debe, y sin esto el total parpadeaba a $0 al agregar un plato.
+    return toSessionDto(result.value, await this.placedFor(tenantId, sessionId));
   }
 
   @Public()
@@ -592,7 +616,9 @@ export class SessionsController {
         result.error.kind === 'NOT_YOUR_LINE' ? HttpStatus.FORBIDDEN : HttpStatus.CONFLICT;
       throw new HttpException(result.error, status);
     }
-    return toSessionDto(result.value);
+    // Con lo ya enviado: tocar el carrito no cambia lo que la mesa
+    // debe, y sin esto el total parpadeaba a $0 al agregar un plato.
+    return toSessionDto(result.value, await this.placedFor(tenantId, sessionId));
   }
 
   @Public()
@@ -621,7 +647,9 @@ export class SessionsController {
     if (result.isErr()) {
       throw new HttpException(result.error, HttpStatus.CONFLICT);
     }
-    return toSessionDto(result.value);
+    // Con lo ya enviado: tocar el carrito no cambia lo que la mesa
+    // debe, y sin esto el total parpadeaba a $0 al agregar un plato.
+    return toSessionDto(result.value, await this.placedFor(tenantId, sessionId));
   }
 
   /**
