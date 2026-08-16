@@ -243,7 +243,10 @@ const ROLE_NAMES: Record<string, string> = {
           }
         </details>
 
-        <details class="details new-dish">
+        <!-- Abierto, no plegado.
+             Escondido detrás de un resumen, alguien lo llenaba, lo cerraba y
+             se quedaba sin saber si el plato se había guardado. -->
+        <details class="details new-dish" open>
           <summary>+ agregar un plato nuevo</summary>
           <form class="new-form" (submit)="createProduct($event)">
             <label class="field">
@@ -273,8 +276,10 @@ const ROLE_NAMES: Record<string, string> = {
               <p class="status error">{{ error }}</p>
             }
             @if (createdName(); as name) {
+              <!-- El plato ya está guardado; la foto es opcional y va después.
+                   Decirlo acá evita que alguien crea que faltó algo. -->
               <p class="status created" role="status">
-                {{ name }} ya está en tu carta ✓ — subile una foto acá al lado
+                <strong>{{ name }}</strong> ya está en tu carta ✓
               </p>
             }
           </form>

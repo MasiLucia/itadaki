@@ -116,11 +116,20 @@
   color: var(--itadaki-ink);
 }
 
+/*
+ * Pestañas, no píldoras sueltas.
+ *
+ * Una carta se lee por secciones, así que las categorías son el índice: una
+ * fila continua con la activa subrayada lee como las solapas de una carta
+ * de papel, y deja claro en qué parte del menú está parado el comensal.
+ */
 .chips {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.25rem;
   overflow-x: auto;
-  padding-bottom: 0.25rem;
+  padding-bottom: 0;
+  border-bottom: 1px solid var(--itadaki-border);
+  scroll-behavior: smooth;
   scrollbar-width: none;
 }
 
@@ -161,22 +170,48 @@
 }
 
 .chip {
+  position: relative;
   flex-shrink: 0;
   border: none;
-  border-radius: var(--itadaki-radius-pill);
-  padding: 0.55rem 1rem;
+  border-radius: 0;
+  padding: 0.7rem 0.9rem;
   font-family: inherit;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   font-weight: 600;
   cursor: pointer;
-  background: var(--itadaki-surface-raised);
-  color: var(--itadaki-ink);
-  transition: background 0.18s ease, color 0.18s ease;
+  background: transparent;
+  color: var(--itadaki-ink-subtle);
+  transition: color 0.2s ease;
+}
+
+/* La línea crece desde el centro al elegir la categoría. */
+.chip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  right: 50%;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--itadaki-accent);
+  transition:
+    left 0.22s cubic-bezier(0.2, 0, 0.2, 1),
+    right 0.22s cubic-bezier(0.2, 0, 0.2, 1);
 }
 
 .chip[aria-pressed='true'] {
-  background: var(--itadaki-accent);
-  color: white;
+  color: var(--itadaki-ink-strong);
+}
+
+.chip[aria-pressed='true']::after {
+  left: 0.7rem;
+  right: 0.7rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip::after {
+    transition: none;
+  }
 }
 
 /* Squared-off and box-led, so it never gets mistaken for a category pill. */
@@ -309,34 +344,92 @@
 .list {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
+  gap: 0.6rem;
   align-content: start;
 }
 
-/* On a tablet or desktop the carte becomes a gallery. */
-@media (min-width: 640px) {
+/*
+ * En pantalla ancha, dos columnas de filas.
+ *
+ * No una galería de tarjetas grandes: la fila ya es compacta, y con más
+ * ancho conviene ver más platos a la vez antes que agrandar cada uno.
+ */
+@media (min-width: 760px) {
   .list {
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
   }
 }
 
+/*
+ * Las filas entran escalonadas al cambiar de categoría.
+ *
+ * Sin esto el cambio era un salto seco y no quedaba claro que la lista se
+ * había renovado. El retraso se corta a la sexta: más allá se siente lento
+ * en vez de fluido.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .card {
+    animation: card-in 0.28s cubic-bezier(0.2, 0, 0.2, 1) both;
+  }
+
+  .card:nth-child(1) { animation-delay: 0ms; }
+  .card:nth-child(2) { animation-delay: 25ms; }
+  .card:nth-child(3) { animation-delay: 50ms; }
+  .card:nth-child(4) { animation-delay: 75ms; }
+  .card:nth-child(5) { animation-delay: 100ms; }
+  .card:nth-child(n + 6) { animation-delay: 120ms; }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Una fila, no una tarjeta con foto grande arriba.
+ *
+ * Con la foto a todo el ancho cada plato ocupaba media pantalla y una carta
+ * de veinte platos era interminable: había que scrollear mucho para
+ * comparar dos precios. En fila entran cinco o seis de una, que es como se
+ * lee una carta de papel.
+ */
 .card {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem;
   background: var(--itadaki-surface-raised);
   border-radius: var(--itadaki-radius-card);
-  overflow: hidden;
   box-shadow: var(--itadaki-shadow-card);
-  transition: box-shadow 0.18s ease, transform 0.18s ease;
+  transition:
+    box-shadow 0.2s cubic-bezier(0.2, 0, 0.2, 1),
+    transform 0.2s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+/* Se levanta apenas al tocarla: confirma que la fila entera es tocable. */
+.card:active {
+  transform: scale(0.995);
+  box-shadow: var(--itadaki-shadow-card);
 }
 
 /* The photo and text open the dish; the button below adds it. A button cannot
    nest inside a link, so the card is a container rather than one anchor. */
 .card-link {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
   text-decoration: none;
   color: inherit;
+  min-width: 0;
 }
 
 @media (hover: hover) {
@@ -348,15 +441,16 @@
 
 .photo-pic {
   display: block;
-  width: 100%;
+  flex: 0 0 auto;
 }
 
-/* Wide and shallow: enough to recognise the dish without pushing the price and
-   the add button off a phone screen. */
+/* Chica y cuadrada, a la izquierda: alcanza para reconocer el plato sin que
+   la foto sea lo que domina la pantalla. */
 .photo {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  height: auto;
+  width: 76px;
+  height: 76px;
+  aspect-ratio: 1;
+  border-radius: calc(var(--itadaki-radius-card) - 0.35rem);
   object-fit: cover;
   display: block;
   background-size: cover;
@@ -384,17 +478,22 @@
 .card-body {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  /* The add button carries the bottom spacing now. */
-  padding: 0.95rem 1.05rem 0.85rem;
+  gap: 0.15rem;
   min-width: 0;
 }
 
+/*
+ * El precio va debajo del nombre, no al lado.
+ *
+ * En una fila angosta, nombre y precio en la misma línea dejaban al nombre
+ * dos palabras antes de cortarse. Debajo, el nombre usa el ancho completo y
+ * el precio queda igual de visible.
+ */
 .card-head {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.85rem;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
 }
 
 .card-name {
@@ -407,20 +506,22 @@
 }
 
 .card-desc {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--itadaki-ink-subtle);
-  line-height: 1.5;
-  /* Two lines keep every card the same height on a grid. */
+  line-height: 1.4;
+  /* Dos líneas: alcanza para explicar el plato sin estirar la fila. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
+/* El precio ordena la decisión, así que pesa más que la descripción. */
 .price {
   font-family: var(--itadaki-font-display);
-  font-weight: 600;
-  font-size: 0.98rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-top: 0.15rem;
   color: var(--itadaki-ink-strong);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -506,23 +607,37 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Full width and its own row: the primary action on a card, not a corner icon. */
+/*
+ * Compacto y a la derecha de la fila.
+ *
+ * A todo el ancho sumaba una línea entera por plato: con veinte platos eran
+ * veinte líneas sólo de botones. Sigue siendo tocable con el pulgar — 44px
+ * de alto, que es el mínimo cómodo.
+ */
 .card-add {
-  display: block;
-  width: calc(100% - 2.1rem);
-  margin: 0 1.05rem 1.05rem;
+  display: grid;
+  place-items: center;
+  align-self: center;
   border: none;
   border-radius: var(--itadaki-radius-pill);
   background: var(--itadaki-ink);
   color: white;
-  padding: 0.65rem 1rem;
+  padding: 0.55rem 0.95rem;
   font-family: var(--itadaki-font-display);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  min-height: 42px;
+  min-height: 44px;
+  white-space: nowrap;
   text-align: center;
   text-decoration: none;
+  transition:
+    transform 0.15s cubic-bezier(0.2, 0, 0.2, 1),
+    background 0.15s ease;
+}
+
+.card-add:active {
+  transform: scale(0.94);
 }
 
 .card-add:disabled {
