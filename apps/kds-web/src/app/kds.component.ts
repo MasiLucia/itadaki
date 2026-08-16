@@ -128,22 +128,25 @@ const SLA_LATE = 15;
                   @for (item of visibleItems(ticket); track item.orderId + item.id) {
                     <li class="ticket-item" [attr.data-item-status]="item.status">
                       <span class="qty">{{ item.quantity }}</span>
+                      <!-- La estación cierra el bloque del plato, debajo del
+                           nombre y de la nota: es un dato del plato, no una
+                           acción. Al lado del nombre se leía como parte de él. -->
                       <span class="item-body">
                         <span class="item-name">{{ item.name }}</span>
                         @if (item.notes !== '') {
                           <span class="item-note">{{ item.notes }}</span>
                         }
-                      </span>
-                      <!-- La estación arriba y la acción abajo, las dos contra
-                           el margen derecho: el chip pegado al nombre se leía
-                           como parte del plato, y el botón suelto entre medio
-                           cambiaba de lugar según lo largo que fuera el nombre. -->
-                      <span class="item-side">
                         <span class="item-station" [attr.data-station]="item.station">
                           {{ stationLabel(item.station) }}
                         </span>
-                        <!-- Each dish carries its own stage: a cook can send the
-                             empanadas out while the roast is still cooking. -->
+                      </span>
+                      <!-- Sólo la acción contra el margen derecho, siempre en
+                           el mismo lugar: el botón entre medio se corría según
+                           lo largo que fuera el nombre.
+
+                           Each dish carries its own stage: a cook can send the
+                           empanadas out while the roast is still cooking. -->
+                      <span class="item-side">
                         @if (nextFor(item.status); as step) {
                           <button
                             type="button"

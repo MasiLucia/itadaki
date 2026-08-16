@@ -288,16 +288,13 @@
   align-items: start;
 }
 
-/* Estación y acción, apiladas contra el margen derecho. Posición fija, no
-   "después del nombre": el cocinero siempre busca el botón en el mismo lugar,
-   sea "empanadas" o "milanesa napolitana con papas". */
+/* Sólo la acción, contra el margen derecho. Posición fija, no "después del
+   nombre": el cocinero siempre busca el botón en el mismo lugar, sea
+   "empanadas" o "milanesa napolitana con papas". */
 .item-side {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.35rem;
+  align-items: flex-start;
   justify-self: end;
-  min-width: 0;
 }
 
 /* Quantity is what a cook checks first; give it weight of its own. */
@@ -338,7 +335,11 @@
   color: var(--itadaki-accent);
 }
 
+/* Cierra el bloque del plato: al ancho de su texto y no del renglón, o el
+   fondo de color se estiraría hasta el borde y dejaría de leerse como chip. */
 .item-station {
+  align-self: flex-start;
+  margin-top: 0.15rem;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -449,7 +450,6 @@
 /* Per-dish action: small and inline, so the ticket's own button stays the
    primary move for the common case of sending everything together. */
 .item-btn {
-  align-self: flex-end;
   white-space: nowrap;
   border: 1px solid var(--itadaki-border);
   background: var(--itadaki-surface-raised);
