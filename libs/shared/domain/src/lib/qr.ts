@@ -425,6 +425,29 @@ export function isQrError(value: QrMatrix | QrError): value is QrError {
 }
 
 /**
+ * El margen blanco que el código necesita alrededor.
+ *
+ * Cuatro módulos, como manda la norma. No es decoración: el lector encuentra
+ * el código buscando los tres cuadrados de las esquinas contra un fondo claro,
+ * y sin ese margen un QR pegado al borde de su recuadro directamente no se
+ * detecta. Se nota más en pantalla que en papel, porque alrededor hay botones
+ * y texto en vez de hoja en blanco.
+ */
+export const QR_QUIET_ZONE = 4;
+
+/**
+ * El `viewBox` del SVG, con la zona de silencio incluida.
+ *
+ * Va acá y no en cada pantalla para que el margen escale con el código: en
+ * píxeles fijos se queda corto justo cuando la matriz es más densa, que es
+ * cuando más falta hace.
+ */
+export function qrViewBox(matrix: QrMatrix): string {
+  const total = matrix.size + QR_QUIET_ZONE * 2;
+  return `${-QR_QUIET_ZONE} ${-QR_QUIET_ZONE} ${total} ${total}`;
+}
+
+/**
  * Renders a matrix as an SVG path. Printable and scalable, and it embeds in a
  * page without a canvas or a data URL round-trip.
  */

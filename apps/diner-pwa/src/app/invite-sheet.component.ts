@@ -1,4 +1,4 @@
-import { encodeQr, isQrError, qrToSvgPath } from '@itadaki/shared/domain';
+import { QR_QUIET_ZONE, encodeQr, isQrError, qrToSvgPath, qrViewBox } from '@itadaki/shared/domain';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -30,13 +30,21 @@ import { SessionStore } from './session.store';
       @if (qr(); as code) {
         <p class="title">Que lo escaneen desde sus teléfonos</p>
 
+        <!-- El blanco cubre también la zona de silencio: el rectángulo arranca
+             en el borde del viewBox y no en el primer módulo. -->
         <svg
           class="qr"
-          [attr.viewBox]="'0 0 ' + code.size + ' ' + code.size"
+          [attr.viewBox]="code.viewBox"
           role="img"
           aria-label="Código para unirse a la mesa"
         >
-          <rect [attr.width]="code.size" [attr.height]="code.size" fill="white" />
+          <rect
+            [attr.x]="-code.quiet"
+            [attr.y]="-code.quiet"
+            [attr.width]="code.size + code.quiet * 2"
+            [attr.height]="code.size + code.quiet * 2"
+            fill="white"
+          />
           <path [attr.d]="code.path" fill="black" />
         </svg>
 
@@ -109,15 +117,15 @@ import { SessionStore } from './session.store';
 
     /* Lo más grande que entre: el link lleva el token de la mesa entero, así
        que la matriz es de 61 módulos y a 240px cada uno quedaba en 3,9px —
-       al límite de lo que una cámara enfoca de cerca. Acá cada módulo pasa de
-       5px, y el borde blanco es la zona de silencio que el lector necesita
-       para encontrar el código. */
+       al límite de lo que una cámara enfoca de cerca.
+
+       La zona de silencio va adentro del SVG, no como padding: así escala con
+       el código en vez de quedarse corta justo cuando la matriz es más densa. */
     .qr {
       width: min(86vw, 320px);
       height: auto;
       border-radius: 8px;
       background: white;
-      padding: 12px;
     }
 
     .target {
@@ -192,7 +200,12 @@ export class InviteSheetComponent implements OnDestroy {
 
     const matrix = encodeQr(current.url);
     if (isQrError(matrix)) return null;
-    return { path: qrToSvgPath(matrix), size: matrix.size };
+    return {
+      path: qrToSvgPath(matrix),
+      size: matrix.size,
+      viewBox: qrViewBox(matrix),
+      quiet: QR_QUIET_ZONE,
+    };
   });
 
   constructor() {

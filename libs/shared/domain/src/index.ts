@@ -7,7 +7,15 @@ export {
   minorUnitExponent,
 } from './lib/currency';
 export { Money, type MoneyError } from './lib/money';
-export { type QrMatrix, type QrError, encodeQr, isQrError, qrToSvgPath } from './lib/qr';
+export {
+  type QrMatrix,
+  type QrError,
+  encodeQr,
+  isQrError,
+  qrToSvgPath,
+  qrViewBox,
+  QR_QUIET_ZONE,
+} from './lib/qr';
 export {
   type RateLimitRule,
   type RateLimitDecision,
