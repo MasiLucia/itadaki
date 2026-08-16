@@ -14,6 +14,15 @@ export interface SessionReader {
     tenantId: string,
     tableId: string,
   ): Promise<Result<SessionState | null, OrderRepositoryError>>;
+
+  /**
+   * Todas las mesas ocupadas ahora mismo.
+   *
+   * Lo que el salón necesita para no perder una mesa de vista: el tablero de
+   * cocina sólo muestra lo que tiene platos en curso, así que una mesa que ya
+   * recibió todo desaparece de la pantalla aunque no haya pagado.
+   */
+  listOpen(tenantId: string): Promise<Result<readonly SessionState[], OrderRepositoryError>>;
 }
 
 export interface SessionWriter {

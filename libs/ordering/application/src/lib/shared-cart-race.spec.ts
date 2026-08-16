@@ -61,6 +61,10 @@ class InterleavingStore implements SessionReader, SessionWriter {
     return ok(this.state);
   }
 
+  async listOpen(): Promise<Result<readonly SessionState[], OrderRepositoryError>> {
+    return ok([this.state]);
+  }
+
   async save(
     _tenantId: string,
     next: SessionState,

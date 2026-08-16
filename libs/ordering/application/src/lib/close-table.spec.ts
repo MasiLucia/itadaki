@@ -39,6 +39,10 @@ class FakeSessions implements SessionReader, SessionWriter {
     return ok(this.state?.session.status === 'OPEN' ? this.state : null);
   }
 
+  async listOpen(): Promise<Result<readonly SessionState[], OrderRepositoryError>> {
+    return ok(this.state?.session.status === 'OPEN' ? [this.state] : []);
+  }
+
   async mutate(
     tenantId: string,
     sessionId: string,

@@ -53,6 +53,10 @@ class FakeSessionStore implements SessionReader, SessionWriter {
     return ok(found ?? null);
   }
 
+  async listOpen(): Promise<Result<readonly SessionState[], OrderRepositoryError>> {
+    return ok([...this.rows.values()].filter((state) => state.session.status === 'OPEN'));
+  }
+
   async mutate(
     tenantId: string,
     sessionId: string,

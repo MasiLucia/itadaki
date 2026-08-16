@@ -53,6 +53,7 @@ const storeWith = (cart: Cart) => {
   const store: SessionReader & SessionWriter = {
     findById: async () => ok(state),
     findOpenForTable: async () => ok(state),
+    listOpen: async () => ok([state]),
     save: async (_tenantId, next) => {
       state = next;
       return ok(state);

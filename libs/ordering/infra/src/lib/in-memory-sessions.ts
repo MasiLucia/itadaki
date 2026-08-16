@@ -36,6 +36,13 @@ export class InMemorySessionStore implements SessionReader, SessionWriter {
     return ok(found ?? null);
   }
 
+  async listOpen(tenantId: string): Promise<Result<readonly SessionState[], OrderRepositoryError>> {
+    const open = [...this.tenantRows(tenantId).values()].filter(
+      (state) => state.session.status === 'OPEN',
+    );
+    return ok(open.sort((a, b) => a.session.openedAt.getTime() - b.session.openedAt.getTime()));
+  }
+
   async mutate(
     tenantId: string,
     sessionId: string,

@@ -323,6 +323,20 @@ export class PostgresSessionStore implements SessionReader, SessionWriter {
     }
   }
 
+  async listOpen(tenantId: string): Promise<Result<readonly SessionState[], OrderRepositoryError>> {
+    try {
+      const rows = await this.db.withTenant(tenantId, async (client) => {
+        const result = await client.query<SessionRow>(
+          "SELECT * FROM table_sessions WHERE status = 'OPEN' ORDER BY opened_at",
+        );
+        return result.rows;
+      });
+      return ok(rows.map((row) => this.toState(row)));
+    } catch (error) {
+      return err({ kind: 'STORAGE_FAILURE', detail: String(error) });
+    }
+  }
+
   /**
    * Closes sessions left open long past any plausible meal.
    *
