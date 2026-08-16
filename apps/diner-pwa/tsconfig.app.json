@@ -15,5 +15,7 @@
     "strictInjectionParameters": true
   },
   "files": ["src/main.ts"],
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "//": "Los specs corren con jest, que usa tsconfig.base.json y trae los tipos de jest. Dentro del build de la app no existe `expect` y rompe la compilación.",
+  "exclude": ["src/**/*.spec.ts"]
 }
