@@ -15,6 +15,7 @@ import {
   type PaymentMethod,
   type TableCall,
   needsCardReader,
+  paysAtCounter,
 } from '@itadaki/ordering/domain';
 import { z } from 'zod';
 import {
@@ -47,6 +48,8 @@ const toDto = (call: TableCall) => ({
   paymentMethod: call.paymentMethod,
   /** Precomputed so no screen has to re-derive the rule. */
   needsCardReader: needsCardReader(call),
+  /** La mesa paga en la caja: el mozo tiene que confirmarlo, nadie cobra allá. */
+  paysAtCounter: paysAtCounter(call),
   raisedAt: call.raisedAt.toISOString(),
 });
 
@@ -164,5 +167,54 @@ export class CallsController {
       callId: updated.value.id,
     });
     return toDto(updated.value);
+  }
+
+  /**
+   * La mesa se arrepiente de haber llamado.
+   *
+   * Tocar por error el timbre manda al mozo a caminar sin motivo, y sin forma
+   * de deshacerlo la única salida era esperar a que llegara para decirle que
+   * no hacía falta. Cancelarlo es exactamente lo mismo que atenderlo — el
+   * llamado deja de estar pendiente — pero lo pide la mesa.
+   *
+   * Sólo se cancela un llamado de la propia mesa: el guard prueba el QR, y
+   * acá se comprueba que el llamado sea de esa sesión.
+   */
+  @Public()
+  @RateLimit('diner')
+  @TableScoped()
+  @Patch(':sessionId/:id/cancel')
+  async cancel(
+    @Param('sessionId') sessionId: string,
+    @Param('id') callId: string,
+    @Scope() scope: DinerScope,
+  ) {
+    const session = await this.sessions.store.findById(scope.tenantId, sessionId);
+    if (session.isErr()) {
+      throw new HttpException(session.error, HttpStatus.NOT_FOUND);
+    }
+    if (scope.tableId !== null && session.value.session.tableId !== scope.tableId) {
+      throw new HttpException({ kind: 'WRONG_TABLE' }, HttpStatus.FORBIDDEN);
+    }
+
+    const pending = await this.calls.store.listForSession(scope.tenantId, sessionId);
+    if (pending.isErr()) {
+      throw new HttpException(pending.error, HttpStatus.BAD_GATEWAY);
+    }
+    if (!pending.value.some((call) => call.id === callId)) {
+      throw new HttpException({ kind: 'NOT_THIS_TABLE' }, HttpStatus.FORBIDDEN);
+    }
+
+    const cancelled = await this.calls.store.acknowledge(scope.tenantId, callId, new Date());
+    if (cancelled.isErr()) {
+      throw new HttpException(cancelled.error, HttpStatus.NOT_FOUND);
+    }
+
+    await this.realtime.callRaised({
+      tenantId: scope.tenantId,
+      sessionId,
+      callId,
+    });
+    return { cancelled: callId };
   }
 }

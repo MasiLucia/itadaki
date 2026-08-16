@@ -18,7 +18,7 @@ export type CallStatus = 'PENDING' | 'ACKNOWLEDGED';
  * the card reader before walking over, and a free-text line is something you
  * read rather than something you see.
  */
-export const PAYMENT_METHODS = ['CARD', 'CASH', 'UNDECIDED'] as const;
+export const PAYMENT_METHODS = ['CARD', 'CASH', 'COUNTER', 'UNDECIDED'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export interface TableCall {
@@ -72,6 +72,18 @@ export function alreadyWaiting(
 /** Whether the waiter should take the card reader to the table. */
 export function needsCardReader(call: TableCall): boolean {
   return call.reason === 'BILL' && call.paymentMethod === 'CARD';
+}
+
+/**
+ * Si la mesa dijo que paga en la caja.
+ *
+ * Es el caso que más se escapa: nadie cobra en la mesa, así que el sistema
+ * no se entera de si pagaron. El mozo tiene que confirmarlo antes de liberar
+ * la mesa, o queda ocupada por gente que ya se fue — o peor, se libera una
+ * que todavía no pagó.
+ */
+export function paysAtCounter(call: TableCall): boolean {
+  return call.reason === 'BILL' && call.paymentMethod === 'COUNTER';
 }
 
 export function acknowledge(call: TableCall, at: Date): TableCall {

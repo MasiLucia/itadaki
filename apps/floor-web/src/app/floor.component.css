@@ -185,6 +185,19 @@
   font-weight: 700;
 }
 
+/* Pagan en la caja: es lo único que el sistema no puede confirmar solo, así
+   que pesa más que el resto de los avisos. */
+.counter {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #92400e;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .posnet {
   align-self: flex-start;
   margin-top: 0.25rem;

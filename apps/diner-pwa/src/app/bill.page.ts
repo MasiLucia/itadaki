@@ -189,6 +189,16 @@ const CURRENCIES = ['ARS', 'USD', 'EUR', 'BRL'] as const;
               tarjeta
             </button>
           </div>
+          <!-- En la caja nadie cobra en la mesa, así que el sistema no se
+               entera de si pagaron: el mozo lo confirma antes de liberarla. -->
+          <button
+            type="button"
+            class="cta ghost wide"
+            [disabled]="calls.busy()"
+            (click)="tell('COUNTER')"
+          >
+            vamos a pagar en la caja
+          </button>
           @if (calls.error(); as message) {
             <p class="confirm-note" role="alert">{{ message }}</p>
           }

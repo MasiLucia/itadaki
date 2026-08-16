@@ -28,6 +28,40 @@ export class CallStore {
 
   readonly waitingFor = computed(() => new Set(this.pending().map((call) => call.reason)));
 
+  /** El llamado abierto de ese tipo, para poder cancelarlo. */
+  callFor(reason: CallReason): CallDto | null {
+    return this.pending().find((call) => call.reason === reason) ?? null;
+  }
+
+  /**
+   * Deshace un llamado que la mesa no quiso hacer.
+   *
+   * Tocar por error el timbre manda al mozo a caminar sin motivo, y sin esto
+   * la única salida era esperar a que llegara para decirle que no hacía falta.
+   */
+  async cancel(sessionId: string, reason: CallReason): Promise<boolean> {
+    const call = this.callFor(reason);
+    if (call === null) return false;
+
+    this.busy.set(true);
+    this.error.set(null);
+
+    try {
+      const response = await this.api.send(`/calls/${sessionId}/${call.id}/cancel`, 'PATCH', {});
+      if (!response.ok) {
+        this.error.set('No pudimos cancelar. Probá de nuevo.');
+        return false;
+      }
+      await this.load(sessionId);
+      return true;
+    } catch {
+      this.error.set('Sin conexión');
+      return false;
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   async load(sessionId: string): Promise<void> {
     try {
       const response = await this.api.fetch(`/calls/${sessionId}`);

@@ -73,6 +73,12 @@ const CALL_LABELS: Record<string, string> = {
               <span class="reason">{{ label(call.reason) }}</span>
               @if (call.needsCardReader) {
                 <span class="posnet">Llevá el posnet</span>
+              } @else if (call.paysAtCounter) {
+                <!-- El caso que más se escapa: nadie cobra en la mesa, así que
+                     el sistema no se entera de si pagaron. Sin este aviso la
+                     mesa queda ocupada por gente que ya se fue, o se libera
+                     una que todavía no pasó por la caja. -->
+                <span class="counter">Pagan en caja · confirmá antes de liberar</span>
               } @else if (call.paymentMethod === 'CASH') {
                 <span class="paying">Pagan en efectivo</span>
               }
@@ -106,6 +112,11 @@ const CALL_LABELS: Record<string, string> = {
                 <span class="table">Mesa {{ tableNumber(mesa.tableId) }}</span>
                 <span class="amount">{{ money(mesa.owed) }}</span>
                 <span class="note">{{ mesa.diners }} en la mesa</span>
+                @if (store.payingAtCounter().has(mesa.sessionId)) {
+                  <!-- Acá se decide liberar, así que el aviso tiene que estar
+                       acá: en la lista de llamados se pierde entre los otros. -->
+                  <span class="counter">Dijeron que pagan en la caja</span>
+                }
               </div>
               <div class="card-side">
                 @if (mesa.since !== null) {

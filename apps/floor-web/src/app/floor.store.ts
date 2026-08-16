@@ -16,6 +16,8 @@ export interface CallDto {
   readonly paymentMethod: 'CARD' | 'CASH' | 'UNDECIDED' | null;
   /** The API decides this so every screen says the same thing. */
   readonly needsCardReader: boolean;
+  /** Van a pagar en la caja: nadie cobra en la mesa, hay que confirmarlo. */
+  readonly paysAtCounter: boolean;
   readonly raisedAt: string;
 }
 
@@ -125,6 +127,23 @@ export class FloorStore {
    * listos aparecía cuatro veces seguidas y el mozo tenía que darse cuenta
    * solo de que era el mismo viaje.
    */
+  /**
+   * Las mesas que avisaron que pagan en la caja.
+   *
+   * El aviso llega como un llamado, pero la decisión de liberar se toma en la
+   * lista de impagas: sin cruzarlos, el mozo ve "debe $12.400" sin saber que
+   * esa mesa ya está pagando en la caja y libera una que sí pagó — o espera
+   * un cobro en la mesa que nunca va a llegar.
+   */
+  readonly payingAtCounter = computed(
+    () =>
+      new Set(
+        this.calls()
+          .filter((call) => call.paysAtCounter)
+          .map((call) => call.sessionId),
+      ),
+  );
+
   readonly pickupsByTable = computed(() => {
     const mesas = new Map<
       string,

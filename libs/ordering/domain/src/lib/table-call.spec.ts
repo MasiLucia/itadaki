@@ -1,5 +1,6 @@
 import {
   CALL_REASONS,
+  paysAtCounter,
   PAYMENT_METHODS,
   needsCardReader,
   type TableCall,
@@ -70,8 +71,10 @@ describe('table calls', () => {
 });
 
 describe('how the table means to pay', () => {
-  it('offers the three answers a table can give', () => {
-    expect([...PAYMENT_METHODS]).toEqual(['CARD', 'CASH', 'UNDECIDED']);
+  it('offers the four answers a table can give', () => {
+    // COUNTER es el que el sistema no puede confirmar solo: nadie cobra en
+    // la mesa, así que el mozo tiene que decir si pagaron.
+    expect([...PAYMENT_METHODS]).toEqual(['CARD', 'CASH', 'COUNTER', 'UNDECIDED']);
   });
 
   it('tells the waiter to bring the card reader', () => {
@@ -94,5 +97,26 @@ describe('how the table means to pay', () => {
 
   it('handles an older call with no method recorded', () => {
     expect(needsCardReader(call({ reason: 'BILL', paymentMethod: null }))).toBe(false);
+  });
+});
+
+describe('la mesa que paga en la caja', () => {
+  it('lo marca para que el mozo lo confirme', () => {
+    // Nadie cobra en la mesa, así que el sistema no puede saber solo si
+    // pagaron: sin este aviso se libera una mesa que no pasó por la caja.
+    expect(paysAtCounter(call({ reason: 'BILL', paymentMethod: 'COUNTER' }))).toBe(true);
+  });
+
+  it('no lo confunde con quien paga en la mesa', () => {
+    expect(paysAtCounter(call({ reason: 'BILL', paymentMethod: 'CASH' }))).toBe(false);
+    expect(paysAtCounter(call({ reason: 'BILL', paymentMethod: 'CARD' }))).toBe(false);
+  });
+
+  it('no lleva el posnet a una mesa que paga en la caja', () => {
+    expect(needsCardReader(call({ reason: 'BILL', paymentMethod: 'COUNTER' }))).toBe(false);
+  });
+
+  it('lo ignora en un llamado que no es de cuenta', () => {
+    expect(paysAtCounter(call({ reason: 'WAITER', paymentMethod: 'COUNTER' }))).toBe(false);
   });
 });

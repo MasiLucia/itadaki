@@ -53,6 +53,7 @@ export {
   PAYMENT_METHODS,
   type PaymentMethod,
   needsCardReader,
+  paysAtCounter,
   type CallStatus,
   type TableCall,
   CALL_STALE_MINUTES,

@@ -123,16 +123,20 @@ function savePlacement(placement: Placement): void {
           <p class="sheet-title">¿Qué necesitás?</p>
 
           @for (option of options; track option.reason) {
+            <!-- Lo ya pedido se puede deshacer, no queda trabado: tocar el
+                 timbre por error mandaba al mozo a caminar sin motivo y la
+                 única salida era esperarlo para decirle que no hacía falta. -->
             <button
               type="button"
               class="option"
-              [disabled]="calls.busy() || waiting(option.reason)"
-              (click)="raise(option.reason)"
+              [class.on]="waiting(option.reason)"
+              [disabled]="calls.busy() || blocked(option.reason)"
+              (click)="pedirOCancelar(option.reason)"
             >
               <span class="option-text">
                 <span class="option-label">{{ option.label }}</span>
                 <span class="option-hint">
-                  {{ waiting(option.reason) ? 'Ya avisamos · ahí van' : option.hint }}
+                  {{ hintFor(option) }}
                 </span>
               </span>
               @if (waiting(option.reason)) {
@@ -270,6 +274,47 @@ export class CallButtonComponent {
     // Refresh on open: another phone at the table may have called already.
     const sessionId = this.session.session()?.id;
     if (next && sessionId !== undefined) void this.calls.load(sessionId);
+  }
+
+  /**
+   * Si la mesa todavía no pidió nada, no hay cuenta que traer.
+   *
+   * Sin esto el mozo caminaba hasta una mesa que no consumió, y volvía con
+   * las manos vacías. Los otros llamados siguen disponibles: preguntar algo
+   * antes de pedir es exactamente lo que hace alguien que recién se sienta.
+   */
+  protected blocked(reason: CallReason): boolean {
+    return reason === 'BILL' && !this.tableHasOrdered();
+  }
+
+  private tableHasOrdered(): boolean {
+    const state = this.session.session();
+    if (state === null) return false;
+    const cart = state.lines.length > 0;
+    const placed = (state.placedTotal?.amountInMinorUnits ?? 0) > 0;
+    return cart || placed;
+  }
+
+  protected hintFor(option: { reason: CallReason; hint: string }): string {
+    if (this.blocked(option.reason)) return 'Todavía no pidieron nada';
+    return this.waiting(option.reason) ? 'Ya avisamos · tocá para cancelar' : option.hint;
+  }
+
+  /**
+   * Pide o cancela, según si ya está pedido.
+   *
+   * Un solo botón para las dos cosas: el estado se ve en el mismo lugar
+   * donde se cambia, sin una segunda fila de botones de deshacer.
+   */
+  protected async pedirOCancelar(reason: CallReason): Promise<void> {
+    if (!this.waiting(reason)) {
+      await this.raise(reason);
+      return;
+    }
+
+    const sessionId = this.session.session()?.id;
+    if (sessionId === undefined) return;
+    await this.calls.cancel(sessionId, reason);
   }
 
   protected async raise(reason: CallReason): Promise<void> {
