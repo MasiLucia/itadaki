@@ -106,8 +106,15 @@ export class RateLimitGuard implements CanActivate {
     // a ciegas cambia de dirección cuando quiere, pero no cambia de mesa. El
     // token identifica una y es lo que hay antes de validar nada.
     if (name === 'join') {
-      const body = request.body as { tableToken?: unknown } | undefined;
-      const token = typeof body?.tableToken === 'string' ? body.tableToken : '';
+      const body = request.body as { tableToken?: unknown; invite?: unknown } | undefined;
+      // Por invitación no viaja el token de la mesa: el código de invitación
+      // identifica igual de bien de qué mesa se trata.
+      const token =
+        typeof body?.tableToken === 'string'
+          ? body.tableToken
+          : typeof body?.invite === 'string'
+            ? body.invite
+            : '';
       return `${name}:${createHash('sha256').update(token).digest('base64url')}`;
     }
 

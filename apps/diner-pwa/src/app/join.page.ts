@@ -12,7 +12,7 @@ const SUGGESTIONS = ['Ana', 'Beto', 'Cami', 'Dani', 'Eli', 'Fede', 'Gaby', 'Nico
   styleUrl: './join.page.css',
   template: `
     <main class="join">
-      @if (!table.hasToken()) {
+      @if (!puedeEntrar()) {
         <p class="no-token" role="alert">
           Escaneá el QR de tu mesa para poder pedir. Podés ver la carta igual.
         </p>
@@ -78,7 +78,7 @@ const SUGGESTIONS = ['Ana', 'Beto', 'Cami', 'Dani', 'Eli', 'Fede', 'Gaby', 'Nico
         <button
           type="submit"
           class="cta"
-          [disabled]="nickname().trim() === '' || !codeReady() || busy() || !table.hasToken()"
+          [disabled]="nickname().trim() === '' || !codeReady() || busy() || !puedeEntrar()"
         >
           {{ busy() ? 'Entrando…' : 'Entrar a la mesa →' }}
         </button>
@@ -99,6 +99,14 @@ export class JoinPage {
   /** Con invitación no hay código que completar: ya viene autorizado. */
   protected readonly codeReady = computed(
     () => this.table.invite() !== null || this.code().length === 6,
+  );
+
+  /**
+   * Quien llega por invitación todavía no tiene token de mesa — lo recibe al
+   * entrar — así que exigirlo acá lo dejaba con el botón muerto.
+   */
+  protected readonly puedeEntrar = computed(
+    () => this.table.hasToken() || this.table.invite() !== null,
   );
 
   protected onInput(event: Event): void {

@@ -177,7 +177,13 @@ export class SessionStore {
     this.api.unblock();
 
     const tableToken = this.table.token();
-    if (tableToken === null) {
+    const invitacion = this.table.invite();
+    const restaurante = this.table.tenant();
+
+    // Con invitación no hace falta el token: el QR de un amigo no lo lleva
+    // —así la matriz queda legible— y el servidor lo emite al canjearla.
+    const porInvitacion = invitacion !== null && restaurante !== null;
+    if (tableToken === null && !porInvitacion) {
       this.joinError.set('escaneá el QR de tu mesa para pedir');
       return false;
     }
@@ -186,16 +192,15 @@ export class SessionStore {
     // la pestaña la mandaba contra "ese nombre ya está en la mesa" — y el
     // único nombre que quería usar era justamente ese.
     const anterior = this.storedDinerId();
-    const invitacion = this.table.invite();
 
     const response = await this.api.send('/sessions/join', 'POST', {
-      tableToken,
       nickname,
+      ...(tableToken === null ? {} : { tableToken }),
       ...(anterior === null ? {} : { dinerId: anterior }),
       ...(joinCode === undefined || joinCode === '' ? {} : { joinCode }),
       // Quien entra por el QR de un amigo no tiene el PIN, ni tiene por qué:
       // la invitación ya prueba que alguien de la mesa lo dejó pasar.
-      ...(invitacion === null ? {} : { invite: invitacion }),
+      ...(porInvitacion ? { invite: invitacion, tenant: restaurante } : {}),
     });
 
     if (!response.ok) {
@@ -230,7 +235,18 @@ export class SessionStore {
       return false;
     }
 
-    const created = (await response.json()) as { dinerId: string; session: SessionDto };
+    const created = (await response.json()) as {
+      dinerId: string;
+      session: SessionDto;
+      tableToken?: string;
+    };
+
+    // Quien entró por invitación recibe acá su token de mesa: sin él, la carta
+    // carga pero no puede pedir nada.
+    if (created.tableToken !== undefined) {
+      this.table.accept(created.tableToken);
+    }
+
     this.myDinerId.set(created.dinerId);
     this.session.set(created.session);
     // El PIN no se guarda porque no vuelve: para sumar gente está la

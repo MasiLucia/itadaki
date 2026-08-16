@@ -17,27 +17,37 @@ const STORAGE_KEY = 'itadaki.table-token';
  * gone from the URL. Reading it at module load — which happens before
  * `bootstrapApplication` — is what makes a scanned QR survive that redirect.
  */
-function captureFromUrl(): { token: string | null; invite: string | null } {
+function captureFromUrl(): {
+  token: string | null;
+  invite: string | null;
+  tenant: string | null;
+} {
   const params = new URLSearchParams(globalThis.location.search);
   const fromUrl = params.get('t');
   // La invitación de quien ya está sentado, cuando se entra escaneando su QR
-  // en vez del impreso de la mesa.
+  // en vez del impreso de la mesa. Viene con el restaurante al lado y sin
+  // token: el token lo emite el servidor al canjearla, y meterlo en el QR
+  // hacía una matriz que ninguna cámara podía leer de una pantalla.
   const invite = params.get('i');
+  const tenant = params.get('r');
 
   if (fromUrl !== null && fromUrl !== '') {
     localStorage.setItem(STORAGE_KEY, fromUrl);
   }
 
-  if (fromUrl === null && invite === null) return { token: null, invite: null };
+  if (fromUrl === null && invite === null) return { token: null, invite: null, tenant: null };
 
   // Drop it from the address bar: a shared screenshot of the URL should
   // not hand someone else a working table token.
   const clean = new URL(globalThis.location.href);
-  clean.searchParams.delete('t');
-  clean.searchParams.delete('i');
+  for (const key of ['t', 'i', 'r']) clean.searchParams.delete(key);
   globalThis.history.replaceState({}, '', clean.toString());
 
-  return { token: fromUrl === '' ? null : fromUrl, invite: invite === '' ? null : invite };
+  return {
+    token: fromUrl === '' ? null : fromUrl,
+    invite: invite === '' ? null : invite,
+    tenant: tenant === '' ? null : tenant,
+  };
 }
 
 const CAPTURED = captureFromUrl();
@@ -83,6 +93,20 @@ export class TableTokenStore {
    * conservarla sólo serviría para reintentar algo que ya no funciona.
    */
   readonly invite = signal<string | null>(CAPTURED.invite);
+
+  /** El restaurante, que viaja con la invitación porque el token no está. */
+  readonly tenant = signal<string | null>(CAPTURED.tenant);
+
+  /**
+   * Guarda el token que emitió el servidor al canjear una invitación.
+   *
+   * Quien entró así no escaneó el QR impreso, y sin token no puede pedir nada:
+   * cada endpoint de comensal lo exige.
+   */
+  accept(token: string): void {
+    this.token.set(token);
+    localStorage.setItem(STORAGE_KEY, token);
+  }
 
   /** La mesa que dice el QR, disponible antes de unirse. */
   readonly tableLabel = computed(() => tableFromToken(this.token()));
