@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TRACKING_STEPS, trackingStepOf, type OrderStatus } from '@itadaki/ordering/domain';
+import { BackLinkComponent } from './back-link.component';
 import { SessionStore } from './session.store';
 import { TrackingStore, type TrackedOrder } from './tracking.store';
 
@@ -20,11 +21,12 @@ const STEP_LABELS: Record<string, { title: string; hint: string }> = {
 @Component({
   selector: 'itd-tracking',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, BackLinkComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './tracking.page.css',
   template: `
     <header class="pad">
+      <itd-back to="/carta" label="la carta" />
       <p class="eyebrow">
         mesa 07 · estado
         @if (session.connected()) {

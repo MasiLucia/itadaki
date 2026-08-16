@@ -7,10 +7,12 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { Location } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { type Modifier, type ModifierGroup, type Product } from '@itadaki/catalog/domain';
 import { type ModifierSnapshot } from '@itadaki/ordering/domain';
 import { Money } from '@itadaki/shared/domain';
+import { goBack } from './back';
 import { MODIFIER_GROUPS_TOKEN, PRODUCT_READER, TENANT } from './catalog.tokens';
 import { CartStore } from './cart.store';
 import { SessionStore } from './session.store';
@@ -25,7 +27,12 @@ import { MoneyPipe } from './money.pipe';
   styleUrl: './product.page.css',
   template: `
     @if (product(); as item) {
-      <a class="back" routerLink="/carta" aria-label="Volver a la carta">←</a>
+      <!-- Botón y no enlace: routerLink apilaba una entrada más, así que
+           volver acá y después tocar atrás del navegador te devolvía al plato
+           que acababas de cerrar. -->
+      <button type="button" class="back" aria-label="Volver a la carta" (click)="back()">
+        ←
+      </button>
 
       @if (item.images; as set) {
         <picture class="hero-pic">
@@ -124,9 +131,14 @@ export class ProductPage {
   private readonly tenant = inject(TENANT);
   private readonly allGroups = inject(MODIFIER_GROUPS_TOKEN);
   private readonly router = inject(Router);
+  private readonly location = inject(Location);
   private readonly cart = inject(CartStore);
   private readonly session = inject(SessionStore);
   private readonly toast = inject(ToastStore);
+
+  protected back(): void {
+    goBack(this.location, this.router, '/carta');
+  }
 
   protected readonly product = signal<Product | null>(null);
   protected readonly failed = signal(false);

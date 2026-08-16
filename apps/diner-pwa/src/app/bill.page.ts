@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DINER_PALETTE } from '@itadaki/shared/ui-tokens';
+import { BackLinkComponent } from './back-link.component';
 import { BillStore, type MoneyDto, type SplitKind, type TipChoice } from './bill.store';
 import { SessionStore } from './session.store';
 
@@ -23,11 +24,12 @@ const CURRENCIES = ['ARS', 'USD', 'EUR', 'BRL'] as const;
 @Component({
   selector: 'itd-bill',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, BackLinkComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './bill.page.css',
   template: `
     <header class="pad">
+      <itd-back to="/carta" label="la carta" />
       <p class="eyebrow">mesa 07 · cuenta</p>
       <h1 class="title">gochisousama!</h1>
     </header>

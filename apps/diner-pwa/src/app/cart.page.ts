@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } 
 import { RouterLink } from '@angular/router';
 import { type CartLine, lineTotal } from '@itadaki/ordering/domain';
 import { Money } from '@itadaki/shared/domain';
+import { BackLinkComponent } from './back-link.component';
 import { CartStore } from './cart.store';
 import { DINER_PALETTE } from '@itadaki/shared/ui-tokens';
 import { SessionStore, type SessionLine } from './session.store';
@@ -11,11 +12,12 @@ import { OrderService } from './order.service';
 @Component({
   selector: 'itd-cart',
   standalone: true,
-  imports: [RouterLink, MoneyPipe],
+  imports: [RouterLink, MoneyPipe, BackLinkComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './cart.page.css',
   template: `
     <header class="pad">
+      <itd-back to="/carta" label="la carta" />
       <p class="eyebrow">
         @if (session.isJoined()) { mesa 07 · pedido compartido } @else { tu pedido }
       </p>
