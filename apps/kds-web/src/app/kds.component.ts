@@ -133,6 +133,15 @@ const SLA_LATE = 15;
                         @if (item.notes !== '') {
                           <span class="item-note">{{ item.notes }}</span>
                         }
+                      </span>
+                      <!-- La estación arriba y la acción abajo, las dos contra
+                           el margen derecho: el chip pegado al nombre se leía
+                           como parte del plato, y el botón suelto entre medio
+                           cambiaba de lugar según lo largo que fuera el nombre. -->
+                      <span class="item-side">
+                        <span class="item-station" [attr.data-station]="item.station">
+                          {{ stationLabel(item.station) }}
+                        </span>
                         <!-- Each dish carries its own stage: a cook can send the
                              empanadas out while the roast is still cooking. -->
                         @if (nextFor(item.status); as step) {
@@ -146,9 +155,6 @@ const SLA_LATE = 15;
                         } @else {
                           <span class="item-done">entregado</span>
                         }
-                      </span>
-                      <span class="item-station" [attr.data-station]="item.station">
-                        {{ stationLabel(item.station) }}
                       </span>
                     </li>
                   }
@@ -189,6 +195,8 @@ const SLA_LATE = 15;
                           @if (item.notes !== '') {
                             <span class="item-note">{{ item.notes }}</span>
                           }
+                        </span>
+                        <span class="item-side">
                           @if (nextFor(item.status); as step) {
                             <button
                               type="button"

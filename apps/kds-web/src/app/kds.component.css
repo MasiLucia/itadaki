@@ -281,8 +281,23 @@
 .ticket-item {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 0.6rem;
+  /* Aire real entre el nombre y la columna de la derecha: con 0.6rem el chip
+     quedaba pegado al texto y se leía como parte del plato. */
+  column-gap: 1rem;
+  row-gap: 0.6rem;
   align-items: start;
+}
+
+/* Estación y acción, apiladas contra el margen derecho. Posición fija, no
+   "después del nombre": el cocinero siempre busca el botón en el mismo lugar,
+   sea "empanadas" o "milanesa napolitana con papas". */
+.item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  justify-self: end;
+  min-width: 0;
 }
 
 /* Quantity is what a cook checks first; give it weight of its own. */
@@ -299,24 +314,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* El botón al lado del nombre, no debajo: apilarlos duplicaba el alto de
-   cada plato, y con veinte mesas activas eso era la diferencia entre ver
-   cinco mesas y ver dos. La nota, cuando hay, sí baja a su propia línea. */
+/* Sólo el plato: nombre y, debajo, la nota. La acción y la estación viven en
+   la columna de la derecha, así el alto de la fila no cambia con el largo del
+   nombre — con veinte mesas activas eso era la diferencia entre ver cinco
+   mesas y ver dos. */
 .item-body {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 0.6rem;
-  row-gap: 0.1rem;
+  flex-direction: column;
+  gap: 0.15rem;
   min-width: 0;
-}
-
-.item-body .item-name {
-  flex: 1 1 auto;
-}
-
-.item-body .item-note {
-  flex: 1 0 100%;
 }
 
 .item-name {
@@ -443,8 +449,8 @@
 /* Per-dish action: small and inline, so the ticket's own button stays the
    primary move for the common case of sending everything together. */
 .item-btn {
-  align-self: flex-start;
-  margin-top: 0.3rem;
+  align-self: flex-end;
+  white-space: nowrap;
   border: 1px solid var(--itadaki-border);
   background: var(--itadaki-surface-raised);
   border-radius: var(--itadaki-radius-pill);
