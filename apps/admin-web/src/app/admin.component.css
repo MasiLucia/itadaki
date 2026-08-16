@@ -899,3 +899,133 @@
     transform: none;
   }
 }
+
+/* ---- La ficha del plato ---- */
+
+/*
+ * Se abre debajo de la lista, sobre el plato elegido.
+ *
+ * En una modal habría que cerrarla para ver la lista y confirmar que se
+ * eligió el correcto; acá los dos quedan a la vista.
+ */
+.dish-sheet {
+  margin-top: 1rem;
+  padding: 1.1rem;
+  border: 1px solid var(--itadaki-accent);
+  border-radius: var(--itadaki-radius-card);
+  background: var(--itadaki-surface);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dish-sheet {
+    animation: sheet-in 0.22s cubic-bezier(0.2, 0, 0.2, 1) both;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.sheet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.sheet-name {
+  margin: 0;
+  font-family: var(--itadaki-font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.sheet-close {
+  border: none;
+  background: none;
+  color: var(--itadaki-ink-soft);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0.2rem;
+}
+
+.sheet-close:hover {
+  color: var(--itadaki-ink);
+}
+
+.edit-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* Nombre y precio en la misma línea: se leen juntos al revisar la carta. */
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, 130px);
+  gap: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Las dietas como casillas, no como texto libre: son las mismas cuatro que
+   la carta ofrece de filtro, y escribirlas a mano las desalinearía. */
+.diets {
+  border: 1px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-card);
+  padding: 0.7rem 0.85rem;
+  margin: 0;
+}
+
+.diets legend {
+  padding: 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--itadaki-ink-soft);
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--itadaki-accent);
+  cursor: pointer;
+}
+
+.sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.sheet-actions .secondary {
+  margin-top: 0;
+}

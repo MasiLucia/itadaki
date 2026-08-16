@@ -30,6 +30,8 @@ interface MenuProduct {
   categoryId: string;
   price: { amountInMinorUnits: number; currency: string };
   available: boolean;
+  /** Lo que leen los filtros de la carta: vegano, sin gluten, etc. */
+  diets: readonly string[];
   imageSet: { variants: Array<{ url: string; width: number; format: string }>; lqip: string } | null;
 }
 
@@ -159,6 +161,65 @@ const ROLE_NAMES: Record<string, string> = {
       @if (activeTab() === 'carta') {
       <section class="panel">
         <h2 class="panel-title">Tus platos</h2>
+
+
+        <!-- Abierto, no plegado.
+             Escondido detrás de un resumen, alguien lo llenaba, lo cerraba y
+             se quedaba sin saber si el plato se había guardado. -->
+        <details class="details new-dish" open>
+          <summary>+ agregar un plato nuevo</summary>
+          <form class="new-form" (submit)="createProduct($event)">
+            <label class="field">
+              <span>nombre</span>
+              <input name="name" required maxlength="60" placeholder="ej: gyoza de cerdo" />
+            </label>
+            <label class="field">
+              <span>descripción</span>
+              <input name="description" maxlength="140" placeholder="ej: seis unidades, salsa ponzu" />
+            </label>
+            <label class="field">
+              <span>precio en pesos</span>
+              <!-- step=1: a price is whatever the restaurant charges, not a
+                   multiple of a hundred. -->
+              <input name="price" type="number" min="0" step="1" required placeholder="4500" />
+            </label>
+            <label class="field">
+              <span>categoría</span>
+              <select name="categoryId">
+                @for (category of categories(); track category.id) {
+                  <option [value]="category.id">{{ category.name }}</option>
+                }
+              </select>
+            </label>
+            <!-- Las dietas se cargan al crear, no después: un plato que
+                 nace sin ellas es invisible para quien filtra la carta, y
+                 nadie vuelve a editarlo para agregarlas. -->
+            <fieldset class="field diets">
+              <legend>apto para</legend>
+              <div class="checks">
+                @for (diet of dietOptions; track diet.id) {
+                  <label class="check">
+                    <input type="checkbox" [name]="'diet-' + diet.id" />
+                    <span>{{ diet.label }}</span>
+                  </label>
+                }
+              </div>
+            </fieldset>
+
+            <button type="submit" class="create">crear plato</button>
+            @if (createError(); as error) {
+              <p class="status error">{{ error }}</p>
+            }
+            @if (createdName(); as name) {
+              <!-- El plato ya está guardado; la foto es opcional y va después.
+                   Decirlo acá evita que alguien crea que faltó algo. -->
+              <p class="status created" role="status">
+                <strong>{{ name }}</strong> ya está en tu carta ✓
+              </p>
+            }
+          </form>
+        </details>
+
         <div class="products">
           @for (product of products(); track product.id) {
             <button
@@ -189,6 +250,87 @@ const ROLE_NAMES: Record<string, string> = {
             <p class="muted">cargando la carta…</p>
           }
         </div>
+
+        <!-- La ficha del plato elegido, acá mismo.
+             Tocar un plato saltaba al editor de fotos y decía "editando X"
+             sin que nadie lo hubiera pedido; la foto es una de las cosas que
+             se le pueden cambiar, no la primera. -->
+        @if (editing(); as dish) {
+          <div class="dish-sheet">
+            <header class="sheet-head">
+              <h3 class="sheet-name">{{ dish.name }}</h3>
+              <button type="button" class="sheet-close" (click)="closeSheet()">cerrar</button>
+            </header>
+
+            <form class="edit-form" (submit)="saveDish($event, dish)">
+              <div class="field-row">
+                <label class="field">
+                  <span>nombre</span>
+                  <input name="name" [value]="dish.name" required maxlength="60" />
+                </label>
+                <label class="field narrow">
+                  <span>precio</span>
+                  <input
+                    name="price"
+                    type="number"
+                    min="0"
+                    step="1"
+                    [value]="dish.price.amountInMinorUnits / 100"
+                    required
+                  />
+                </label>
+              </div>
+
+              <label class="field">
+                <span>descripción</span>
+                <input name="description" [value]="dish.description" maxlength="140" />
+              </label>
+
+              <label class="field">
+                <span>categoría</span>
+                <select name="categoryId">
+                  @for (category of categories(); track category.id) {
+                    <option [value]="category.id" [selected]="category.id === dish.categoryId">
+                      {{ category.name }}
+                    </option>
+                  }
+                </select>
+              </label>
+
+              <!-- Los filtros de la carta leen esto: un plato sin dietas es
+                   invisible para quien busca vegano o sin gluten. -->
+              <fieldset class="field diets">
+                <legend>apto para</legend>
+                <div class="checks">
+                  @for (diet of dietOptions; track diet.id) {
+                    <label class="check">
+                      <input
+                        type="checkbox"
+                        [name]="'diet-' + diet.id"
+                        [checked]="dish.diets.includes(diet.id)"
+                      />
+                      <span>{{ diet.label }}</span>
+                    </label>
+                  }
+                </div>
+              </fieldset>
+
+              @if (editError(); as error) {
+                <p class="status error">{{ error }}</p>
+              }
+              @if (editSaved()) {
+                <p class="status created" role="status">Guardado ✓</p>
+              }
+
+              <div class="sheet-actions">
+                <button type="submit" class="create">Guardar cambios</button>
+                <button type="button" class="secondary" (click)="activeTab.set('fotos')">
+                  Trabajar la foto →
+                </button>
+              </div>
+            </form>
+          </div>
+        }
 
         <details class="details manage-cats">
           <summary>organizar categorías</summary>
@@ -241,48 +383,6 @@ const ROLE_NAMES: Record<string, string> = {
           @if (catError(); as error) {
             <p class="status error">{{ error }}</p>
           }
-        </details>
-
-        <!-- Abierto, no plegado.
-             Escondido detrás de un resumen, alguien lo llenaba, lo cerraba y
-             se quedaba sin saber si el plato se había guardado. -->
-        <details class="details new-dish" open>
-          <summary>+ agregar un plato nuevo</summary>
-          <form class="new-form" (submit)="createProduct($event)">
-            <label class="field">
-              <span>nombre</span>
-              <input name="name" required maxlength="60" placeholder="ej: gyoza de cerdo" />
-            </label>
-            <label class="field">
-              <span>descripción</span>
-              <input name="description" maxlength="140" placeholder="ej: seis unidades, salsa ponzu" />
-            </label>
-            <label class="field">
-              <span>precio en pesos</span>
-              <!-- step=1: a price is whatever the restaurant charges, not a
-                   multiple of a hundred. -->
-              <input name="price" type="number" min="0" step="1" required placeholder="4500" />
-            </label>
-            <label class="field">
-              <span>categoría</span>
-              <select name="categoryId">
-                @for (category of categories(); track category.id) {
-                  <option [value]="category.id">{{ category.name }}</option>
-                }
-              </select>
-            </label>
-            <button type="submit" class="create">crear plato</button>
-            @if (createError(); as error) {
-              <p class="status error">{{ error }}</p>
-            }
-            @if (createdName(); as name) {
-              <!-- El plato ya está guardado; la foto es opcional y va después.
-                   Decirlo acá evita que alguien crea que faltó algo. -->
-              <p class="status created" role="status">
-                <strong>{{ name }}</strong> ya está en tu carta ✓
-              </p>
-            }
-          </form>
         </details>
       </section>
       }
@@ -516,6 +616,74 @@ export class AdminComponent {
   /** Bumped after every upload to bust the browser's image cache. */
   private readonly photoVersion = signal(0);
   protected readonly selected = signal<string | null>(null);
+
+  /** El plato abierto para editar, con todos sus datos actuales. */
+  protected readonly editing = computed(() => {
+    const id = this.selected();
+    return id === null ? null : (this.products().find((p) => p.id === id) ?? null);
+  });
+
+  protected readonly editError = signal<string | null>(null);
+  protected readonly editSaved = signal(false);
+
+  /** Las dietas que la carta ofrece como filtro, con su nombre en español. */
+  protected readonly dietOptions = [
+    { id: 'VEGAN', label: 'vegano' },
+    { id: 'VEGETARIAN', label: 'vegetariano' },
+    { id: 'GLUTEN_FREE', label: 'sin gluten' },
+    { id: 'LACTOSE_FREE', label: 'sin lactosa' },
+  ] as const;
+
+  protected closeSheet(): void {
+    this.selected.set(null);
+    this.editError.set(null);
+    this.editSaved.set(false);
+  }
+
+  /**
+   * Guarda los cambios del plato abierto.
+   *
+   * Manda sólo lo que el formulario muestra: la API deja el resto como está,
+   * así que editar el precio no borra la foto ni los alérgenos cargados.
+   */
+  protected async saveDish(event: Event, dish: MenuProduct): Promise<void> {
+    event.preventDefault();
+    this.editError.set(null);
+    this.editSaved.set(false);
+
+    const form = event.target as HTMLFormElement;
+    const data = new FormData(form);
+    const pesos = Number(data.get('price'));
+
+    if (!Number.isFinite(pesos) || pesos < 0) {
+      this.editError.set('el precio no es válido');
+      return;
+    }
+
+    const diets = this.dietOptions
+      .filter((diet) => data.get(`diet-${diet.id}`) !== null)
+      .map((diet) => diet.id);
+
+    const response = await this.auth.apiFetch(`${API}/menu/products/${dish.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...this.auth.headers() },
+      body: JSON.stringify({
+        name: String(data.get('name') ?? '').trim(),
+        description: String(data.get('description') ?? '').trim(),
+        priceMinor: Math.round(pesos * 100),
+        categoryId: String(data.get('categoryId') ?? ''),
+        diets,
+      }),
+    });
+
+    if (!response.ok) {
+      this.editError.set('no pudimos guardar los cambios');
+      return;
+    }
+
+    this.editSaved.set(true);
+    await this.load();
+  }
   protected readonly status = signal<string | null>(null);
   protected readonly result = signal<{ variants: Array<{ url: string; width: number; format: string }>; lqip: string } | null>(null);
 
@@ -906,6 +1074,9 @@ export class AdminComponent {
         // The form takes pesos; the domain stores integer minor units.
         priceMinor: Math.round(pesos * 100),
         categoryId: String(data.get('categoryId') ?? ''),
+        diets: this.dietOptions
+          .filter((diet) => data.get(`diet-${diet.id}`) !== null)
+          .map((diet) => diet.id),
       }),
     });
 
@@ -953,9 +1124,10 @@ export class AdminComponent {
     this.selected.set(id);
     this.status.set(null);
 
-    // Elegir un plato es el paso previo a trabajar su foto, así que la solapa
-    // acompaña: sin esto había que elegir acá y después buscar dónde seguir.
-    this.activeTab.set('fotos');
+    // Sin saltar de solapa: tocar un plato abre su ficha para editarlo, y
+    // saltar al editor de fotos decía "editando X" sin que nadie lo hubiera
+    // pedido — la foto es una de las cosas que se le pueden cambiar, no la
+    // única ni la primera.
 
     // Show the dish's current photo, if it has one, instead of whatever the
     // previous upload left on screen.

@@ -15,10 +15,25 @@ import { type Result, err, ok } from '@itadaki/shared/domain';
  * cannot change what the diner is charged.
  */
 export class CatalogLinePricer implements LinePricer {
+  /**
+   * Los grupos pueden venir fijos o consultarse por restaurante.
+   *
+   * Una función y no un array: el precio de un extra tiene que salir de lo
+   * que el restaurante cargó, y con un array congelado al arrancar la API
+   * seguía cobrando lo que decía el código aunque el dueño lo cambiara.
+   */
   constructor(
     private readonly products: ProductReader,
-    private readonly groups: readonly ModifierGroup[],
+    private readonly groupsFor:
+      | readonly ModifierGroup[]
+      | ((tenantId: string) => Promise<readonly ModifierGroup[]>),
   ) {}
+
+  private async groupsOf(tenantId: string): Promise<readonly ModifierGroup[]> {
+    return typeof this.groupsFor === 'function'
+      ? this.groupsFor(tenantId)
+      : this.groupsFor;
+  }
 
   async price(
     tenantId: string,
@@ -34,7 +49,7 @@ export class CatalogLinePricer implements LinePricer {
       return err({ kind: 'PRODUCT_UNAVAILABLE', productId: line.productId });
     }
 
-    const known = this.groups
+    const known = (await this.groupsOf(tenantId))
       .filter((group) => group.productId === product.id)
       .flatMap((group) => group.modifiers);
 

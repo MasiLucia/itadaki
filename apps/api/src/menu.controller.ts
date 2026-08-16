@@ -1,3 +1,4 @@
+import { ALLERGENS, DIET_TAGS } from '@itadaki/catalog/domain';
 import {
   Body,
   Controller,
@@ -11,7 +12,6 @@ import {
 } from '@nestjs/common';
 import { setProductAvailability } from '@itadaki/catalog/application';
 import { Public, RequirePermission, TenantId } from './auth';
-import { MODIFIER_GROUPS } from '@itadaki/catalog/infra';
 import { CatalogService } from './catalog.service';
 import { ImagesService } from './images.service';
 import { RealtimeGateway } from './realtime.gateway';
@@ -80,7 +80,9 @@ export class MenuController {
         estimatedPrepMinutes: product.estimatedPrepMinutes,
         station: product.station,
       })),
-      modifierGroups: MODIFIER_GROUPS.map((group) => ({
+      // De la base, no del fixture: el punto de cocción del bife lo define
+      // cada restaurante, no el repositorio.
+      modifierGroups: (await this.catalog.modifierGroups(tenantId)).map((group) => ({
         id: group.id,
         productId: group.productId,
         name: group.name,
@@ -200,6 +202,8 @@ export class MenuController {
         description: z.string().max(140).optional(),
         priceMinor: z.number().int().min(0).optional(),
         station: z.enum(['GRILL', 'COLD', 'BAR', 'DESSERT']).optional(),
+        diets: z.array(z.enum(DIET_TAGS)).max(4).optional(),
+        allergens: z.array(z.enum(ALLERGENS)).max(10).optional(),
       })
       .safeParse(body);
     if (!parsed.success) {
@@ -227,6 +231,8 @@ export class MenuController {
       name: parsed.data.name ?? current.name,
       description: parsed.data.description ?? current.description,
       station: parsed.data.station ?? current.station,
+      diets: parsed.data.diets ?? current.diets,
+      allergens: parsed.data.allergens ?? current.allergens,
       price,
     });
 
@@ -238,6 +244,8 @@ export class MenuController {
       name: saved.value.name,
       categoryId: saved.value.categoryId,
       price: toMoneyDto(saved.value.price),
+      diets: saved.value.diets,
+      allergens: saved.value.allergens,
     };
   }
 
@@ -252,6 +260,11 @@ export class MenuController {
       categoryId: z.string().min(1).max(64),
       station: z.enum(['GRILL', 'COLD', 'BAR', 'DESSERT']).default('COLD'),
       prepMinutes: z.number().int().min(1).max(120).default(10),
+      // Sin esto un plato nace invisible para quien filtra la carta por
+      // vegano o sin gluten: el filtro existe desde el principio y no había
+      // forma de cargar el dato que necesita.
+      diets: z.array(z.enum(DIET_TAGS)).max(4).default([]),
+      allergens: z.array(z.enum(ALLERGENS)).max(10).default([]),
     });
 
     const parsed = schema.safeParse(body);
@@ -275,8 +288,8 @@ export class MenuController {
       description: parsed.data.description,
       price: price.value,
       images: null,
-      allergens: [],
-      diets: [],
+      allergens: parsed.data.allergens,
+      diets: parsed.data.diets,
       estimatedPrepMinutes: parsed.data.prepMinutes,
       available: true,
       station: parsed.data.station,
@@ -312,5 +325,105 @@ export class MenuController {
     }
 
     return { id: result.value.id, available: result.value.available };
+  }
+
+  /**
+   * Los grupos de opciones de un plato: punto de cocción, guarnición, tamaño.
+   *
+   * Hasta acá vivían en un archivo del código, iguales para todos los
+   * restaurantes: una parrilla no podía ofrecer sus propios puntos de cocción
+   * ni una cafetería sus tamaños. Ahora los define cada uno.
+   *
+   * El grupo entero viaja junto porque sus opciones son un conjunto: "jugoso,
+   * a punto, cocido" sólo tiene sentido completo, y guardarlas de a una
+   * dejaría la carta a medio camino si algo falla en el medio.
+   */
+  @RequirePermission('menu:write')
+  @Post('products/:id/options')
+  async saveOptions(
+    @Param('id') productId: string,
+    @Body() body: unknown,
+    @TenantId() tenantId: string,
+  ) {
+    const schema = z.object({
+      id: z.string().min(1).max(64).optional(),
+      name: z.string().min(1).max(40),
+      minSelections: z.number().int().min(0).max(10),
+      maxSelections: z.number().int().min(1).max(10),
+      options: z
+        .array(
+          z.object({
+            name: z.string().min(1).max(40),
+            priceDeltaMinor: z.number().int().min(-1_000_000).max(1_000_000).default(0),
+          }),
+        )
+        .min(1)
+        .max(20),
+    });
+
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) {
+      throw new HttpException(parsed.error.issues, HttpStatus.BAD_REQUEST);
+    }
+
+    // Pedir un mínimo mayor que el máximo deja un grupo que nadie puede
+    // completar: el plato se vuelve imposible de pedir.
+    if (parsed.data.minSelections > parsed.data.maxSelections) {
+      throw new HttpException({ kind: 'MIN_ABOVE_MAX' }, HttpStatus.BAD_REQUEST);
+    }
+
+    if (this.catalog.modifiers === null) {
+      throw new HttpException({ kind: 'NOT_SUPPORTED' }, HttpStatus.NOT_IMPLEMENTED);
+    }
+
+    const found = await this.catalog.products.findById(tenantId, productId);
+    if (found.isErr()) {
+      throw new HttpException(found.error, HttpStatus.NOT_FOUND);
+    }
+
+    const groupId = parsed.data.id ?? `${slugify(parsed.data.name)}-${Date.now().toString(36)}`;
+    const modifiers = [];
+    for (const [index, option] of parsed.data.options.entries()) {
+      const delta = Money.of(option.priceDeltaMinor, found.value.price.currency);
+      if (delta.isErr()) {
+        throw new HttpException(delta.error, HttpStatus.BAD_REQUEST);
+      }
+      modifiers.push({
+        id: `${groupId}-${index}`,
+        name: option.name,
+        priceDelta: delta.value,
+        available: true,
+      });
+    }
+
+    const saved = await this.catalog.modifiers.save(tenantId, {
+      id: groupId,
+      productId,
+      name: parsed.data.name,
+      minSelections: parsed.data.minSelections,
+      maxSelections: parsed.data.maxSelections,
+      modifiers,
+    });
+
+    if (saved.isErr()) {
+      throw new HttpException(saved.error, HttpStatus.BAD_GATEWAY);
+    }
+
+    return { id: saved.value.id, name: saved.value.name };
+  }
+
+  @RequirePermission('menu:write')
+  @Delete('options/:id')
+  async removeOptions(@Param('id') groupId: string, @TenantId() tenantId: string) {
+    if (this.catalog.modifiers === null) {
+      throw new HttpException({ kind: 'NOT_SUPPORTED' }, HttpStatus.NOT_IMPLEMENTED);
+    }
+
+    const removed = await this.catalog.modifiers.remove(tenantId, groupId);
+    if (removed.isErr()) {
+      throw new HttpException(removed.error, HttpStatus.NOT_FOUND);
+    }
+
+    return { removed: groupId };
   }
 }

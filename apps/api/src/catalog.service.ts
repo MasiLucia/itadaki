@@ -10,8 +10,10 @@ import {
   InMemoryProductStore,
   MODIFIER_GROUPS,
   PostgresCategoryStore,
+  PostgresModifierStore,
   PostgresProductStore,
 } from '@itadaki/catalog/infra';
+import { type ModifierGroup } from '@itadaki/catalog/domain';
 import { type LinePricer } from '@itadaki/ordering/application';
 import { CatalogLinePricer } from '@itadaki/ordering/infra';
 import { database } from './database';
@@ -35,5 +37,22 @@ export class CatalogService {
   readonly categories: CategoryReader = this.categoryStore;
   readonly categoryWriter: CategoryWriter = this.categoryStore;
 
-  readonly pricer: LinePricer = new CatalogLinePricer(this.products, MODIFIER_GROUPS);
+  /**
+   * Los grupos de opciones del restaurante.
+   *
+   * En memoria caen al fixture porque no hay dónde leerlos; contra Postgres
+   * salen de la tabla, que es lo que permite que cada restaurante defina sus
+   * propios puntos de cocción y guarniciones.
+   */
+  readonly modifiers = this.usePostgres ? new PostgresModifierStore(database) : null;
+
+  async modifierGroups(tenantId: string): Promise<readonly ModifierGroup[]> {
+    if (this.modifiers === null) return MODIFIER_GROUPS;
+    const found = await this.modifiers.listForTenant(tenantId);
+    return found.isOk() ? found.value : [];
+  }
+
+  readonly pricer: LinePricer = new CatalogLinePricer(this.products, (tenantId) =>
+    this.modifierGroups(tenantId),
+  );
 }
