@@ -14,6 +14,7 @@ import {
   joinTable,
   closeTable,
   leaveTable,
+  listUnsettledTables,
   type SessionState,
 } from '@itadaki/ordering/application';
 import { groupByDiner } from '@itadaki/ordering/domain';
@@ -138,6 +139,37 @@ export class SessionsController {
     }
 
     return found.value;
+  }
+
+  /**
+   * Mesas que ya comieron todo y siguen sin pagar.
+   *
+   * Declarada antes que `:id` a propósito: Nest resuelve por orden y "unsettled"
+   * caería en esa ruta.
+   *
+   * Gated en `orders:advance`, el mismo permiso que libera una mesa: quien
+   * atiende el salón es quien va a cobrar.
+   */
+  @RequirePermission('orders:advance')
+  @Get('unsettled')
+  async unsettled(@TenantId() tenantId: string) {
+    const run = listUnsettledTables({
+      sessions: this.sessions.store,
+      orders: this.orders.store,
+    });
+    const result = await run(tenantId);
+
+    if (result.isErr()) {
+      throw new HttpException(result.error, HttpStatus.BAD_GATEWAY);
+    }
+
+    return result.value.map((table) => ({
+      sessionId: table.sessionId,
+      tableId: table.tableId,
+      owed: toMoneyDto(table.owed),
+      since: table.since?.toISOString() ?? null,
+      diners: table.diners,
+    }));
   }
 
   /** Joins the table's open session, creating it if this is the first diner. */
