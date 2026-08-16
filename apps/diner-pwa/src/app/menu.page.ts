@@ -23,8 +23,36 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
   styleUrl: './menu.page.css',
   template: `
     <header class="pad">
-      <p class="eyebrow">Mesa {{ tableLabel() }}</p>
-      <h1 class="title">Nuestra carta</h1>
+      <!-- La mesa y quiénes están sentados, arriba a la derecha y dentro del
+           documento. Antes los avatares eran una barra fija sobre el pie: se
+           quedaba quieta mientras la carta se movía debajo y tapaba una franja
+           de platos en cada scroll. Acá se lee una vez, al llegar. -->
+      <div class="head-top">
+        <h1 class="title">Nuestra carta</h1>
+
+        @if (session.isJoined()) {
+          <aside class="table-tag" aria-label="Mesa y comensales">
+            <p class="table-tag-name">Mesa {{ tableLabel() }}</p>
+
+            <div class="table-tag-diners">
+              @for (diner of session.session()?.diners ?? []; track diner.id) {
+                <span
+                  class="avatar"
+                  [style.background]="dinerColor(diner.colorIndex)"
+                  [attr.title]="diner.nickname"
+                >{{ initials(diner.nickname) }}</span>
+              }
+            </div>
+
+            <!-- aria-live: alguien que se suma a la mesa aparece sin recargar,
+                 y un lector de pantalla no tiene cómo notarlo si no se anuncia. -->
+            <p class="table-tag-count" aria-live="polite">
+              {{ dinerCount() }} en la mesa
+              @if (session.connected()) { · en vivo }
+            </p>
+          </aside>
+        }
+      </div>
 
       <div class="search-row">
         <label class="itd-visually-hidden" for="menu-search">Buscar en la carta</label>
@@ -208,22 +236,6 @@ const DIET_LABELS: ReadonlyArray<{ tag: DietTag; label: string }> = [
       }
     </main>
 
-    @if (session.isJoined()) {
-      <aside class="table-bar" aria-label="Comensales en la mesa">
-        @for (diner of session.session()?.diners ?? []; track diner.id) {
-          <span
-            class="avatar"
-            [style.background]="dinerColor(diner.colorIndex)"
-            [attr.title]="diner.nickname"
-          >{{ initials(diner.nickname) }}</span>
-        }
-        <span class="table-label">
-          {{ (session.session()?.diners ?? []).length }} en la mesa
-          @if (session.connected()) { · en vivo }
-        </span>
-      </aside>
-    }
-
     @if (sharedCount() > 0) {
       <footer class="foot">
         <a class="cta" routerLink="/carrito">
@@ -319,7 +331,20 @@ export class MenuPage {
   protected readonly activeCategory = signal<string | null>(null);
   protected readonly activeDiets = signal<readonly DietTag[]>([]);
   protected readonly search = signal('');
-  protected readonly tableLabel = signal('07');
+
+  /**
+   * El número de la mesa real, no uno de muestra.
+   *
+   * Sale de la sesión, que es lo único que sabe en qué mesa está este teléfono:
+   * el id viene como "mesa-01", y de ahí se muestran sólo los dígitos, que es
+   * lo que está impreso en el cartelito de la mesa.
+   */
+  protected readonly tableLabel = computed(() => {
+    const tableId = this.session.session()?.tableId ?? '';
+    return /(\d+)\s*$/.exec(tableId)?.[1] ?? tableId;
+  });
+
+  protected readonly dinerCount = computed(() => (this.session.session()?.diners ?? []).length);
 
   /**
    * Filtering runs in the view rather than re-querying: the whole menu is
