@@ -37,8 +37,17 @@ export interface JoinTableCommand {
   readonly currency: CurrencyCode;
   /** Quien vuelve a la misma mesa; ausente la primera vez. */
   readonly dinerId?: string | undefined;
-  /** El código de la mesa, que hace falta desde el segundo comensal. */
+  /** El código que dijo quien quiere sentarse. */
   readonly joinCode?: string | undefined;
+  /**
+   * El código que tiene puesto la mesa, o `undefined` si no tiene ninguno.
+   *
+   * Viene de la mesa y no de la sesión: la sesión no existe hasta que alguien
+   * escanea, así que atado a ella el primero entraba sin código. Con una foto
+   * del QR eso se hacía desde cualquier lado, tantas veces como se quisiera,
+   * y los comensales reales encontraban su mesa tomada.
+   */
+  readonly expectedCode?: string | undefined;
 }
 
 export interface JoinResult {
@@ -57,8 +66,6 @@ export function joinTable(deps: {
   events: SessionEventPublisher;
   newId: () => string;
   now: () => Date;
-  /** El código que se le pone a una mesa recién abierta. */
-  newJoinCode?: () => string;
 }) {
   return async (command: JoinTableCommand): Promise<Result<JoinResult, SessionFailure>> => {
     const existing = await deps.sessions.findOpenForTable(command.tenantId, command.tableId);
@@ -66,9 +73,20 @@ export function joinTable(deps: {
       return err(existing.error);
     }
 
-    // Mesa recién abierta: el código que se le acaba de poner no se le puede
-    // exigir a quien la abrió, que es la persona que lo va a decir después.
-    const abreLaMesa = existing.value === null;
+    // Quien vuelve trae su id: cerrar la pestaña o quedarse sin batería no
+    // debería obligarla a entrar con otro nombre y perder su pedido. Se
+    // acepta sólo si esa persona está realmente sentada en esta mesa.
+    const vuelve =
+      command.dinerId !== undefined &&
+      (existing.value?.session.diners.some((diner) => diner.id === command.dinerId) ?? false);
+
+    // El código se pide siempre, también al primero que se sienta: es lo único
+    // que separa a quien está en el salón de quien tiene una foto del QR. La
+    // excepción es quien ya está en la mesa y vuelve — a esa persona el mozo
+    // ya la sentó.
+    if (!vuelve && !joinCodeAccepted(command.expectedCode, command.joinCode)) {
+      return err({ kind: 'WRONG_JOIN_CODE' });
+    }
 
     const state: SessionState =
       existing.value ??
@@ -79,23 +97,9 @@ export function joinTable(deps: {
           tableId: command.tableId,
           currency: command.currency,
           at: deps.now(),
-          ...(deps.newJoinCode === undefined ? {} : { joinCode: deps.newJoinCode() }),
         }),
         cart: emptyCart(command.currency),
       };
-
-    // Quien vuelve trae su id: cerrar la pestaña o quedarse sin batería no
-    // debería obligarla a entrar con otro nombre y perder su pedido. Se
-    // acepta sólo si esa persona está realmente sentada en esta mesa.
-    const vuelve =
-      command.dinerId !== undefined &&
-      state.session.diners.some((diner) => diner.id === command.dinerId);
-
-    // El código lo piden los que llegan a una mesa en curso. No quien la abre,
-    // ni quien vuelve del baño con la batería agotada: esa ya está sentada.
-    if (!abreLaMesa && !vuelve && !joinCodeAccepted(state.session, command.joinCode)) {
-      return err({ kind: 'WRONG_JOIN_CODE' });
-    }
 
     const dinerId = vuelve && command.dinerId !== undefined ? command.dinerId : deps.newId();
     const joined = joinSession(state.session, {

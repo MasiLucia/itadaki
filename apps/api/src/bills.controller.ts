@@ -28,7 +28,9 @@ import {
 import { lineTotal as cartLineTotal } from '@itadaki/ordering/domain';
 import { Money, type CurrencyCode, type MoneyError, ok } from '@itadaki/shared/domain';
 import { z } from 'zod';
+import { PostgresTableStore } from '@itadaki/identity/infra';
 import { type DinerScope, Public, RequirePermission, Scope, TableScoped } from './auth';
+import { database } from './database';
 import { BillsService } from './bills.service';
 import { SessionsService } from './sessions.service';
 import { OrdersService } from './orders.service';
@@ -78,6 +80,9 @@ export class BillsController {
     private readonly orders: OrdersService,
     private readonly realtime: RealtimeGateway,
   ) {}
+
+  /** Cobrar termina la mesa, y una mesa que termina estrena código. */
+  private readonly tables = new PostgresTableStore(database);
 
   /**
    * Confirms the session belongs to the caller's table.
@@ -213,7 +218,7 @@ export class BillsController {
   @TableScoped()
   @Post(':sessionId/settle')
   async settle(@Param('sessionId') sessionId: string, @Scope() scope: DinerScope) {
-    await this.sessionInScope(scope, sessionId);
+    const state = await this.sessionInScope(scope, sessionId);
 
     const found = await this.bills.store.findBySession(scope.tenantId, sessionId);
     if (found.isErr()) {
@@ -243,6 +248,13 @@ export class BillsController {
       // The bill is paid either way; a stuck session is for staff to clear,
       // not a reason to tell the table their payment failed.
       console.error('bill settled but table stayed open', sessionId, closed.error);
+    }
+
+    // Código nuevo para el grupo que viene: el que se acaba de ir se lo lleva
+    // sabido, y sin renovarlo podría sentarse de nuevo desde afuera.
+    const rotated = await this.tables.rotateJoinCode(scope.tenantId, state.session.tableId);
+    if (rotated.isErr()) {
+      console.error('bill settled but table code stayed', sessionId, rotated.error);
     }
 
     return this.describe(settled.value, 'ARS');

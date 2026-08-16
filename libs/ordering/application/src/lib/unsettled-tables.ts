@@ -14,19 +14,16 @@ import { type SessionReader } from './session-ports';
 export interface OpenTable {
   readonly sessionId: string;
   readonly tableId: string;
-  /** Para cantárselo a quien llega tarde y no puede sentarse. */
-  readonly joinCode: string | null;
   readonly diners: number;
   readonly openedAt: Date;
 }
 
 /**
- * Las mesas ocupadas ahora, con su código.
+ * Las mesas ocupadas ahora mismo.
  *
- * El código sólo lo conoce quien ya está sentado, y eso deja afuera al que
- * llega media hora después: alguien tiene que poder decírselo. Va detrás de un
- * permiso de personal, nunca del token de la mesa — que es justamente lo que
- * el código protege.
+ * Sin el código: ese vive en la mesa, no en la sesión, y lo sirve el endpoint
+ * de códigos — que las lista todas, ocupadas o no, porque el mozo lo necesita
+ * antes de que exista ninguna sesión.
  */
 export function listOpenTables(deps: { sessions: SessionReader }) {
   return async (tenantId: string): Promise<Result<readonly OpenTable[], OrderRepositoryError>> => {
@@ -37,7 +34,6 @@ export function listOpenTables(deps: { sessions: SessionReader }) {
       open.value.map((state) => ({
         sessionId: state.session.id,
         tableId: state.session.tableId,
-        joinCode: state.session.joinCode ?? null,
         diners: state.session.diners.length,
         openedAt: state.session.openedAt,
       })),

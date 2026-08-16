@@ -283,11 +283,6 @@ export class PostgresSessionStore implements SessionReader, SessionWriter {
         colorIndex: diner.colorIndex,
         joinedAt: new Date(diner.joinedAt),
       })),
-      // `?? undefined` y no `?? null`: sin migración aplicada la columna ni
-      // viene, y una mesa sin código es una mesa que no lo pide.
-      ...(row.join_code === null || row.join_code === undefined
-        ? {}
-        : { joinCode: row.join_code }),
     };
 
     const lines: CartLine[] = row.cart_lines.map((line) => ({
@@ -490,9 +485,9 @@ export class PostgresSessionStore implements SessionReader, SessionWriter {
           })),
         ),
         state.session.openedAt,
-        // El código no se toca en el UPDATE: cambiarlo a mitad de servicio
-        // dejaría afuera a quien lo tiene anotado en la servilleta.
-        state.session.joinCode ?? null,
+        // La columna quedó de cuando el código vivía en la sesión. Ahora es de
+        // la mesa: ver la migración 011.
+        null,
       ],
     );
   }

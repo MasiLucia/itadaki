@@ -50,13 +50,18 @@ export interface UnsettledDto {
   readonly diners: number;
 }
 
-/** Una mesa ocupada y su código, para cantárselo al que llega tarde. */
-export interface OpenTableDto {
-  readonly sessionId: string;
+/**
+ * Una mesa y su código, ocupada o no.
+ *
+ * Todas y no sólo las ocupadas: el mozo lo dice al sentar a la gente, o sea
+ * antes de que exista ninguna sesión. Sin esto el primero que llega no puede
+ * entrar a ningún lado.
+ */
+export interface TableCodeDto {
   readonly tableId: string;
+  readonly label: string;
   readonly joinCode: string | null;
   readonly diners: number;
-  readonly openedAt: string;
 }
 
 /** A dish waiting on the pass, flattened out of its ticket. */
@@ -110,7 +115,7 @@ export class FloorStore {
   });
   readonly tickets = signal<readonly TicketDto[]>([]);
   readonly unsettled = signal<readonly UnsettledDto[]>([]);
-  readonly openTables = signal<readonly OpenTableDto[]>([]);
+  readonly tableCodes = signal<readonly TableCodeDto[]>([]);
   readonly connected = signal(false);
 
   /**
@@ -203,11 +208,11 @@ export class FloorStore {
 
   async refresh(): Promise<void> {
     try {
-      const [calls, orders, unsettled, open] = await Promise.all([
+      const [calls, orders, unsettled, codes] = await Promise.all([
         fetch(`${API}/calls`, { headers: this.auth.headers() }),
         fetch(`${API}/orders`, { headers: this.auth.headers() }),
         fetch(`${API}/sessions/unsettled`, { headers: this.auth.headers() }),
-        fetch(`${API}/sessions/open`, { headers: this.auth.headers() }),
+        fetch(`${API}/sessions/codes`, { headers: this.auth.headers() }),
       ]);
 
       // A shift long enough to outlive the session ends here rather than
@@ -217,7 +222,7 @@ export class FloorStore {
       if (calls.ok) this.calls.set((await calls.json()) as CallDto[]);
       if (orders.ok) this.tickets.set((await orders.json()) as TicketDto[]);
       if (unsettled.ok) this.unsettled.set((await unsettled.json()) as UnsettledDto[]);
-      if (open.ok) this.openTables.set((await open.json()) as OpenTableDto[]);
+      if (codes.ok) this.tableCodes.set((await codes.json()) as TableCodeDto[]);
     } catch {
       // Keep the last known room; the next event or reconnect retries.
     }
@@ -230,6 +235,22 @@ export class FloorStore {
 
     await this.outbox.enqueue(`${API}/calls/${callId}/acknowledge`, 'PATCH', {});
     if (this.pending() === 0) await this.refresh();
+  }
+
+  /**
+   * Le pone un código nuevo a una mesa.
+   *
+   * Para cuando se filtró: lo escucharon de la mesa de al lado, o quedó
+   * anotado en una servilleta que se llevaron. Liberar la mesa ya lo renueva
+   * solo, así que esto es para el medio del servicio.
+   */
+  async rotateCode(tableId: string): Promise<void> {
+    const response = await fetch(`${API}/sessions/codes/${tableId}/rotate`, {
+      method: 'POST',
+      headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
+    });
+    if (this.auth.expired(response)) return;
+    if (response.ok) await this.refresh();
   }
 
   /**

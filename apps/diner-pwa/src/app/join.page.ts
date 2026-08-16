@@ -44,31 +44,35 @@ const SUGGESTIONS = ['Ana', 'Beto', 'Cami', 'Dani', 'Eli', 'Fede', 'Gaby', 'Nico
           }
         </div>
 
-        <!-- Aparece recién cuando la mesa lo pide, no de entrada: el primero
-             que se sienta abre la mesa y no tiene a quién pedirle un código. -->
-        @if (store.needsCode()) {
-          <label class="code-label" for="join-code">Código de la mesa</label>
-          <p class="code-hint">
-            Se lo decís a quien ya está sentado, o se lo pedís al mozo.
-          </p>
-          <input
-            id="join-code"
-            class="input code"
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            maxlength="6"
-            placeholder="000000"
-            [value]="code()"
-            (input)="onCode($event)"
-          />
-        }
+        <!-- Desde el primero: el código es de la mesa y existe antes de que
+             nadie escanee. Es lo único que separa a quien está sentado en el
+             salón de quien tiene una foto del QR en el teléfono. -->
+        <label class="code-label" for="join-code">Código de la mesa</label>
+        <p class="code-hint">
+          Te lo da el mozo al sentarte. Si ya hay alguien de tu mesa adentro,
+          también lo puede ver en su teléfono.
+        </p>
+        <input
+          id="join-code"
+          class="input code"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="6"
+          placeholder="000000"
+          [value]="code()"
+          (input)="onCode($event)"
+        />
 
         @if (store.joinError(); as error) {
           <p class="error" role="alert">{{ error }}</p>
         }
 
-        <button type="submit" class="cta" [disabled]="nickname().trim() === '' || busy() || !table.hasToken()">
+        <button
+          type="submit"
+          class="cta"
+          [disabled]="nickname().trim() === '' || code().length < 6 || busy() || !table.hasToken()"
+        >
           {{ busy() ? 'Entrando…' : 'Entrar a la mesa →' }}
         </button>
       </form>

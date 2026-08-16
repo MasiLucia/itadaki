@@ -19,7 +19,7 @@ import {
   type SessionState,
 } from '@itadaki/ordering/application';
 import { groupByDiner } from '@itadaki/ordering/domain';
-import { randomInt } from 'node:crypto';
+import { PostgresTableStore } from '@itadaki/identity/infra';
 import { z } from 'zod';
 import {
   type DinerScope,
@@ -31,6 +31,7 @@ import {
   resolveTableToken,
 } from './auth';
 import { RateLimit } from './rate-limit.guard';
+import { database } from './database';
 import { CatalogService } from './catalog.service';
 import { OrdersService } from './orders.service';
 import { RealtimeGateway } from './realtime.gateway';
@@ -51,22 +52,6 @@ const joinSchema = z.object({
   /** El código de la mesa; hace falta desde el segundo comensal. */
   joinCode: z.string().min(1).max(8).optional(),
 });
-
-/**
- * El código que se le pone a una mesa recién abierta.
- *
- * Seis dígitos y no cuatro. Cuatro se dicen más fácil en una mesa ruidosa,
- * pero son diez mil combinaciones: con el límite de intentos puesto, alguien
- * que ataca una mesa las agota en poco más de una hora, y una sobremesa dura
- * eso. Con seis hacen falta días, y la mesa cierra mucho antes. Es el mismo
- * largo que cualquier código que llega por SMS, así que nadie se sorprende.
- *
- * `randomInt` y no `Math.random()`: esto es control de acceso, y el generador
- * de siempre es predecible si se llegan a ver algunos códigos.
- */
-function newJoinCode(): string {
-  return String(randomInt(0, 1_000_000)).padStart(6, '0');
-}
 
 const addSchema = z.object({
   dinerId: z.string().min(1).max(64),
@@ -124,6 +109,9 @@ export class SessionsController {
     private readonly orders: OrdersService,
     private readonly realtime: RealtimeGateway,
   ) {}
+
+  /** El código de cada mesa vive acá, no en la sesión. */
+  private readonly tables = new PostgresTableStore(database);
 
   /**
    * Loads the session, confirming it is the caller's to touch.
@@ -202,18 +190,72 @@ export class SessionsController {
   @RequirePermission('orders:advance')
   @Get('open')
   async open(@TenantId() tenantId: string) {
-    const result = await listOpenTables({ sessions: this.sessions.store })(tenantId);
+    const [result, tables] = await Promise.all([
+      listOpenTables({ sessions: this.sessions.store })(tenantId),
+      this.tables.list(tenantId),
+    ]);
     if (result.isErr()) {
       throw new HttpException(result.error, HttpStatus.BAD_GATEWAY);
     }
 
+    // El código es de la mesa, así que se lee de ahí y no de la sesión.
+    const codes = new Map(
+      tables.isOk() ? tables.value.map((table) => [table.id, table.joinCode]) : [],
+    );
+
     return result.value.map((table) => ({
       sessionId: table.sessionId,
       tableId: table.tableId,
-      joinCode: table.joinCode,
+      joinCode: codes.get(table.tableId) ?? null,
       diners: table.diners,
       openedAt: table.openedAt.toISOString(),
     }));
+  }
+
+  /**
+   * Todas las mesas con su código, ocupadas o no.
+   *
+   * El mozo lo necesita antes de que la mesa exista como sesión: es lo que
+   * dice al sentar a la gente, y sin esto el primero que llega no puede
+   * entrar. Detrás de un permiso de personal, nunca del token de la mesa.
+   */
+  @RequirePermission('orders:advance')
+  @Get('codes')
+  async codes(@TenantId() tenantId: string) {
+    const [tables, open] = await Promise.all([
+      this.tables.list(tenantId),
+      this.sessions.store.listOpen(tenantId),
+    ]);
+    if (tables.isErr()) {
+      throw new HttpException(tables.error, HttpStatus.BAD_GATEWAY);
+    }
+
+    const seated = new Map(
+      open.isOk() ? open.value.map((state) => [state.session.tableId, state.session.diners.length]) : [],
+    );
+
+    return tables.value.map((table) => ({
+      tableId: table.id,
+      label: table.label,
+      joinCode: table.joinCode,
+      diners: seated.get(table.id) ?? 0,
+    }));
+  }
+
+  /**
+   * Le pone un código nuevo a la mesa, a mano.
+   *
+   * Para cuando el mozo sospecha que se filtró: alguien lo escuchó de la mesa
+   * de al lado, o quedó anotado en una servilleta que se llevaron.
+   */
+  @RequirePermission('orders:advance')
+  @Post('codes/:tableId/rotate')
+  async rotateCode(@Param('tableId') tableId: string, @TenantId() tenantId: string) {
+    const rotated = await this.tables.rotateJoinCode(tenantId, tableId);
+    if (rotated.isErr()) {
+      throw new HttpException(rotated.error, HttpStatus.BAD_GATEWAY);
+    }
+    return { tableId, joinCode: rotated.value };
   }
 
   /** Joins the table's open session, creating it if this is the first diner. */
@@ -233,12 +275,18 @@ export class SessionsController {
       throw new HttpException({ kind: 'INVALID_TABLE_TOKEN' }, HttpStatus.UNAUTHORIZED);
     }
 
+    // El código que la mesa tiene puesto ahora. Sale de la mesa y no de la
+    // sesión: tiene que existir antes de que nadie escanee, o el primero en
+    // hacerlo entra sin código — y con una foto del QR eso se hace desde
+    // cualquier lado.
+    const seated = await this.tables.find(table.tenantId, table.tableId);
+    const expectedCode = seated.isOk() ? (seated.value.joinCode ?? undefined) : undefined;
+
     const run = joinTable({
       sessions: this.sessions.store,
       events: this.realtime,
       newId: () => crypto.randomUUID(),
       now: () => new Date(),
-      newJoinCode,
     });
 
     const result = await run({
@@ -248,6 +296,7 @@ export class SessionsController {
       currency: 'ARS',
       ...(parsed.data.dinerId === undefined ? {} : { dinerId: parsed.data.dinerId }),
       ...(parsed.data.joinCode === undefined ? {} : { joinCode: parsed.data.joinCode }),
+      ...(expectedCode === undefined ? {} : { expectedCode }),
     });
 
     if (result.isErr()) {
@@ -260,14 +309,15 @@ export class SessionsController {
       throw new HttpException(result.error, status);
     }
 
-    // El código viaja sólo acá, en la respuesta a quien acaba de entrar, y
-    // nunca en el DTO de la sesión: `GET /sessions/:id` está detrás del token
-    // de la mesa, así que incluirlo ahí se lo regalaría a la misma foto del QR
-    // de la que estamos defendiendo la mesa.
+    // El código viaja sólo acá, a quien ya demostró conocerlo, y nunca en el
+    // DTO de la sesión: `GET /sessions/:id` está detrás del token de la mesa,
+    // así que incluirlo ahí se lo regalaría a la misma foto del QR de la que
+    // estamos defendiendo la mesa. Se devuelve para que quien ya está sentado
+    // se lo pueda pasar al que llega tarde sin ir a buscar al mozo.
     return {
       dinerId: result.value.dinerId,
       session: toSessionDto(result.value.state),
-      joinCode: result.value.state.session.joinCode ?? null,
+      joinCode: expectedCode ?? null,
     };
   }
 
@@ -448,12 +498,22 @@ export class SessionsController {
   @RequirePermission('orders:advance')
   @Post(':id/release')
   async release(@Param('id') sessionId: string, @TenantId() tenantId: string) {
+    // Antes de cerrarla, de qué mesa era: después la sesión ya no la nombra.
+    const before = await this.sessions.store.findById(tenantId, sessionId);
+
     const run = closeTable({ sessions: this.sessions.store, events: this.realtime });
     const result = await run({ tenantId, sessionId });
 
     if (result.isErr()) {
       throw new HttpException(result.error, HttpStatus.CONFLICT);
     }
+
+    // Código nuevo para el grupo que viene. Sin esto, el que se acaba de ir se
+    // lo lleva anotado y puede volver a sentarse desde afuera esta noche.
+    if (before.isOk()) {
+      await this.tables.rotateJoinCode(tenantId, before.value.session.tableId);
+    }
+
     // Cerrar no devuelve la mesa: ya no hay nada que mostrar de ella.
     return { released: true };
   }

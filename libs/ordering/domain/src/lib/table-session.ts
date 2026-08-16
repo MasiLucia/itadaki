@@ -18,19 +18,6 @@ export interface TableSession {
   readonly currency: CurrencyCode;
   readonly diners: readonly Diner[];
   readonly openedAt: Date;
-
-  /**
-   * El código que hay que decir para sentarse en esta mesa.
-   *
-   * El QR impreso no vence nunca, así que una foto suya vale para siempre y
-   * desde cualquier lado. Este código no: nace con la mesa, muere cuando se
-   * cierra, y sólo lo sabe quien ya está sentado o el mozo. La foto sola deja
-   * de alcanzar para sumarse a una mesa en curso.
-   *
-   * Opcional porque las sesiones abiertas antes de esto no lo tienen, y
-   * echarlas a todas de golpe sería peor que el agujero que cierra.
-   */
-  readonly joinCode?: string;
 }
 
 export type SessionError =
@@ -59,7 +46,6 @@ export function openSession(params: {
   tableId: string;
   currency: CurrencyCode;
   at: Date;
-  joinCode?: string;
 }): TableSession {
   return {
     id: params.id,
@@ -69,24 +55,29 @@ export function openSession(params: {
     currency: params.currency,
     diners: [],
     openedAt: params.at,
-    ...(params.joinCode === undefined ? {} : { joinCode: params.joinCode }),
   };
 }
 
 /**
- * Si este código deja entrar a la mesa.
+ * Si este código deja sentarse en la mesa.
  *
- * El primero que se sienta abre la mesa y no tiene a quién pedirle el código:
- * ahí no hay nada que comprobar. A partir del segundo sí, y es la persona que
- * ya está sentada —o el mozo— quien lo dice en voz alta.
+ * El código es de la mesa, no de la sesión, y por eso se compara siempre —
+ * también contra el primero que llega. Cuando estaba en la sesión, el primero
+ * entraba gratis porque la sesión nacía con él, y eso dejaba abierta la puerta
+ * que el código venía a cerrar: con una foto del QR se abría la mesa desde
+ * afuera, tantas veces como se quisiera.
  *
- * Comparación de largo fijo: el código son cuatro dígitos y probarlos todos
- * es cuestión de minutos, así que además de esto el endpoint va con límite de
- * intentos.
+ * Una mesa sin código puesto no pide ninguno: es lo que pasa con las que
+ * existían antes de esto, y dejarlas sin poder recibir gente sería peor.
+ *
+ * Comparación de tiempo constante: recorre los dígitos completos aunque el
+ * primero ya no coincida, para no filtrar por demora cuántos acertó.
  */
-export function joinCodeAccepted(session: TableSession, given: string | undefined): boolean {
-  const expected = session.joinCode;
-  if (expected === undefined) return true;
+export function joinCodeAccepted(
+  expected: string | undefined,
+  given: string | undefined,
+): boolean {
+  if (expected === undefined || expected === '') return true;
   if (given === undefined || given.length !== expected.length) return false;
 
   let same = 0;

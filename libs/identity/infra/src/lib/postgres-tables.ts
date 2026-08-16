@@ -1,5 +1,6 @@
 import { type Result, err, ok } from '@itadaki/shared/domain';
 import { type Database } from '@itadaki/shared/persistence';
+import { randomInt } from 'node:crypto';
 import { newTableSecret } from './table-token';
 
 export interface RestaurantTable {
@@ -8,6 +9,19 @@ export interface RestaurantTable {
   readonly label: string;
   readonly seats: number;
   readonly secret: string;
+
+  /**
+   * El código que hay que decir para sentarse en esta mesa.
+   *
+   * Vive en la mesa y no en la sesión a propósito: tiene que existir antes de
+   * que nadie escanee. Atado a la sesión, el primero en escanear entraba sin
+   * código —la sesión todavía no existía— y con una foto del QR eso se hacía
+   * desde cualquier lado, dejando la mesa tomada.
+   *
+   * Lo sabe el mozo, que lo dice al sentar a la gente, y se renueva cuando la
+   * mesa se libera. `null` en una mesa que todavía no tiene uno asignado.
+   */
+  readonly joinCode: string | null;
 }
 
 export type TableError =
@@ -20,6 +34,23 @@ interface TableRow {
   label: string;
   seats: number;
   qr_secret: string;
+  /** Null en una mesa a la que todavía no se le asignó código. */
+  join_code: string | null;
+}
+
+/**
+ * Un código nuevo para sentarse en la mesa.
+ *
+ * Seis dígitos: los mismos de cualquier código que llega por SMS, se dictan de
+ * memoria y son un millón de combinaciones. Con cuatro, alguien que prueba a
+ * ciegas agota el espacio en poco más de una hora, que es lo que dura una
+ * sobremesa.
+ *
+ * `randomInt` y no `Math.random()`: esto decide quién se sienta en una mesa, y
+ * el generador de siempre es predecible si se llegan a ver algunos códigos.
+ */
+export function newJoinCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, '0');
 }
 
 export class PostgresTableStore {
@@ -52,6 +83,7 @@ export class PostgresTableStore {
             label: row.label,
             seats: row.seats,
             secret: row.qr_secret,
+            joinCode: row.join_code ?? null,
           });
     } catch (error) {
       return err({ kind: 'STORAGE_FAILURE', detail: String(error) });
@@ -74,6 +106,7 @@ export class PostgresTableStore {
           label: row.label,
           seats: row.seats,
           secret: row.qr_secret,
+          joinCode: row.join_code ?? null,
         })),
       );
     } catch (error) {
@@ -81,20 +114,47 @@ export class PostgresTableStore {
     }
   }
 
-  async save(table: Omit<RestaurantTable, 'secret'>): Promise<Result<RestaurantTable, TableError>> {
+  async save(
+    table: Omit<RestaurantTable, 'secret' | 'joinCode'>,
+  ): Promise<Result<RestaurantTable, TableError>> {
     try {
       const secret = newTableSecret();
       await this.db.withTenant(table.tenantId, async (client) => {
         await client.query(
-          `INSERT INTO restaurant_tables (tenant_id, id, label, seats, qr_secret)
-           VALUES ($1,$2,$3,$4,$5)
+          `INSERT INTO restaurant_tables (tenant_id, id, label, seats, qr_secret, join_code)
+           VALUES ($1,$2,$3,$4,$5,$6)
            ON CONFLICT (tenant_id, id) DO UPDATE SET
              label = EXCLUDED.label, seats = EXCLUDED.seats`,
-          [table.tenantId, table.id, table.label, table.seats, secret],
+          [table.tenantId, table.id, table.label, table.seats, secret, newJoinCode()],
         );
       });
       const saved = await this.find(table.tenantId, table.id);
       return saved.isErr() ? err(saved.error) : ok(saved.value);
+    } catch (error) {
+      return err({ kind: 'STORAGE_FAILURE', detail: String(error) });
+    }
+  }
+
+  /**
+   * Le pone un código nuevo a la mesa.
+   *
+   * Se llama al liberar la mesa, para que el código de un grupo no le sirva al
+   * siguiente ni a quien lo haya anotado, y a mano desde salón cuando el mozo
+   * sospecha que se filtró.
+   *
+   * Una mesa sin código queda con uno igual: sirve para asignárselo a las
+   * mesas que existían antes de que esto existiera.
+   */
+  async rotateJoinCode(tenantId: string, tableId: string): Promise<Result<string, TableError>> {
+    try {
+      const code = newJoinCode();
+      await this.db.withTenant(tenantId, async (client) => {
+        await client.query(
+          'UPDATE restaurant_tables SET join_code = $3 WHERE tenant_id = $1 AND id = $2',
+          [tenantId, tableId, code],
+        );
+      });
+      return ok(code);
     } catch (error) {
       return err({ kind: 'STORAGE_FAILURE', detail: String(error) });
     }

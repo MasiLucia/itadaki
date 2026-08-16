@@ -58,15 +58,13 @@ export class SessionStore {
   readonly connected = signal(false);
   readonly joinError = signal<string | null>(null);
 
-  /** La mesa ya estaba abierta y hace falta su código para sentarse. */
-  readonly needsCode = signal(false);
-
   /**
    * El código de esta mesa, para poder decírselo a quien llega después.
    *
-   * Sólo lo tiene quien ya entró: la API lo manda una vez, al unirse, y nunca
-   * en la lectura de la sesión — esa está detrás del token de la mesa, que es
-   * exactamente lo que el código protege.
+   * Sólo lo tiene quien ya entró: la API lo manda una vez, al unirse, a quien
+   * acaba de demostrar que lo conocía. Nunca en la lectura de la sesión — esa
+   * está detrás del token de la mesa, que es exactamente lo que el código
+   * protege.
    */
   readonly joinCode = signal<string | null>(null);
 
@@ -181,13 +179,10 @@ export class SessionStore {
     if (!response.ok) {
       const detail = (await response.json().catch(() => null)) as { kind?: string } | null;
 
-      // La mesa ya está abierta y pide su código. No es un error de la persona
-      // la primera vez: nadie le dijo todavía que hacía falta uno.
       if (detail?.kind === 'WRONG_JOIN_CODE') {
-        this.needsCode.set(true);
         this.joinError.set(
           joinCode === undefined || joinCode === ''
-            ? 'Pedile el código de la mesa a quien ya está sentado, o al mozo'
+            ? 'Pedile el código de la mesa al mozo'
             : 'Ese código no es el de esta mesa',
         );
         return false;
@@ -212,7 +207,6 @@ export class SessionStore {
     };
     this.myDinerId.set(created.dinerId);
     this.session.set(created.session);
-    this.needsCode.set(false);
     this.joinCode.set(created.joinCode);
     localStorage.setItem(
       STORAGE_KEY,

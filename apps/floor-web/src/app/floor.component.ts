@@ -141,9 +141,10 @@ const CALL_LABELS: Record<string, string> = {
         </section>
       }
 
-      <!-- Los códigos de las mesas ocupadas. Plegado: sólo hace falta cuando
-           alguien llega tarde y no encuentra a quién pedírselo. -->
-      @if (store.openTables().length > 0) {
+      <!-- El código que el mozo le dice a la mesa al sentarla. Todas las mesas,
+           no sólo las ocupadas: hace falta justo antes de que la mesa exista.
+           Plegado, porque se consulta al sentar y no durante todo el turno. -->
+      @if (store.tableCodes().length > 0) {
         <section class="block" aria-labelledby="codes-title">
           <button
             type="button"
@@ -153,16 +154,26 @@ const CALL_LABELS: Record<string, string> = {
             (click)="showCodes.set(!showCodes())"
           >
             <span class="quiet-title">Códigos de mesa</span>
-            <span class="cooking-count">{{ store.openTables().length }} abiertas</span>
+            <span class="cooking-count">{{ store.tableCodes().length }} mesas</span>
             <span class="cooking-chevron">{{ showCodes() ? '−' : '+' }}</span>
           </button>
 
           @if (showCodes()) {
-            @for (mesa of store.openTables(); track mesa.sessionId) {
+            <p class="quiet">
+              Decíselo a la mesa al sentarla. Se renueva solo cuando la liberás.
+            </p>
+            @for (mesa of store.tableCodes(); track mesa.tableId) {
               <p class="cooking-row">
                 <span class="table small">Mesa {{ tableNumber(mesa.tableId) }}</span>
-                <span class="cooking-items">{{ mesa.diners }} sentados</span>
+                <span class="cooking-items">
+                  {{ mesa.diners > 0 ? mesa.diners + ' sentados' : 'libre' }}
+                </span>
                 <span class="join-code">{{ mesa.joinCode ?? 'sin código' }}</span>
+                <!-- Para cuando se filtró: lo escucharon de la mesa de al lado
+                     o quedó anotado en una servilleta que se llevaron. -->
+                <button type="button" class="release" (click)="rotate(mesa.tableId)">
+                  Renovar
+                </button>
               </p>
             }
           }
@@ -283,6 +294,10 @@ export class FloorComponent implements OnDestroy {
   protected async release(sessionId: string): Promise<void> {
     this.confirming.set(null);
     await this.store.releaseTable(sessionId);
+  }
+
+  protected async rotate(tableId: string): Promise<void> {
+    await this.store.rotateCode(tableId);
   }
 
   /** Un solo toque: cobrar es lo que pasa en casi todas las mesas. */
