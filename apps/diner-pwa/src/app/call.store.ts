@@ -23,6 +23,14 @@ export class CallStore {
   private readonly api = inject(ApiClient);
 
   readonly pending = signal<readonly CallDto[]>([]);
+
+  /** Lo que el servidor rechaza, dicho en la mesa y no en código de error. */
+  private static readonly MENSAJES: Readonly<Record<string, string>> = {
+    TOO_MANY_REQUESTS: 'Esperá un momento antes de volver a llamar',
+    SESSION_CLOSED: 'La cuenta de esta mesa ya se cerró',
+    NOTHING_ORDERED: 'Todavía no pidieron nada',
+    ALREADY_CALLING: 'Ya hay un llamado en curso en esta mesa',
+  };
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
 
@@ -94,12 +102,15 @@ export class CallStore {
       if (!response.ok) {
         const detail = (await response.json().catch(() => null)) as { kind?: string } | null;
         this.error.set(
-          detail?.kind === 'TOO_MANY_REQUESTS'
-            ? 'Esperá un momento antes de volver a llamar'
-            : detail?.kind === 'SESSION_CLOSED'
-              ? 'La cuenta de esta mesa ya se cerró'
-              : 'No pudimos avisar. Probá de nuevo.',
+          CallStore.MENSAJES[detail?.kind ?? ''] ?? 'No pudimos avisar. Probá de nuevo.',
         );
+
+        // El servidor sabe algo que la pantalla no: otro teléfono de la mesa
+        // llamó primero, o el pedido se canceló mientras esta hoja estaba
+        // abierta. Recargar deja los botones como corresponde.
+        if (detail?.kind === 'ALREADY_CALLING' || detail?.kind === 'NOTHING_ORDERED') {
+          await this.load(sessionId);
+        }
         return false;
       }
 

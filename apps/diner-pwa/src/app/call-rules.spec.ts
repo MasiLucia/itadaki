@@ -73,3 +73,40 @@ describe('un llamado a la vez', () => {
     expect(blocked('BILL', { hasOrdered: true, waiting })).toBe(false);
   });
 });
+
+describe('quien todavía no se sentó', () => {
+  /** Lo que decide si esta persona ya consumió, como lo hace el componente. */
+  const consumio = ({
+    joined,
+    lines,
+    placedMinor,
+  }: {
+    joined: boolean;
+    lines: number;
+    placedMinor: number;
+  }): boolean => {
+    if (!joined) return false;
+    return lines > 0 || placedMinor > 0;
+  };
+
+  it('no cuenta como consumo lo de una mesa a la que no se unió', () => {
+    // Mirar sólo el total de la mesa dejaba pedir la cuenta a quien abrió el
+    // QR desde la vereda: la mesa venía comiendo de antes, así que el total
+    // daba mayor a cero aunque esta persona no se hubiera sentado.
+    expect(consumio({ joined: false, lines: 0, placedMinor: 1_370_000 })).toBe(false);
+    expect(blocked('BILL', { hasOrdered: false, waiting: nada })).toBe(true);
+  });
+
+  it('cuenta el consumo una vez que se unió', () => {
+    expect(consumio({ joined: true, lines: 0, placedMinor: 1_370_000 })).toBe(true);
+  });
+
+  it('cuenta lo que está en el carrito aunque no se haya enviado', () => {
+    // Ya eligieron y están por mandarlo: es consumo a la vista.
+    expect(consumio({ joined: true, lines: 2, placedMinor: 0 })).toBe(true);
+  });
+
+  it('una mesa recién abierta no tiene cuenta que pedir', () => {
+    expect(consumio({ joined: true, lines: 0, placedMinor: 0 })).toBe(false);
+  });
+});

@@ -29,6 +29,7 @@ import {
 import { RateLimit } from './rate-limit.guard';
 import { CallsService } from './calls.service';
 import { SessionsService } from './sessions.service';
+import { OrdersService } from './orders.service';
 import { RealtimeGateway } from './realtime.gateway';
 
 const raiseSchema = z.object({
@@ -59,6 +60,7 @@ export class CallsController {
   constructor(
     private readonly calls: CallsService,
     private readonly sessions: SessionsService,
+    private readonly orders: OrdersService,
     private readonly realtime: RealtimeGateway,
   ) {}
 
@@ -109,6 +111,38 @@ export class CallsController {
     // staff screen with nobody sitting there.
     if (session.value.session.status === 'CLOSED') {
       throw new HttpException({ kind: 'SESSION_CLOSED' }, HttpStatus.CONFLICT);
+    }
+
+    // Ya viene filtrado por los que están pendientes.
+    const pending = await this.calls.store.listForSession(scope.tenantId, sessionId);
+    const waiting = pending.isOk() ? pending.value : [];
+
+    // Una mesa que no consumió no tiene cuenta que pedir. La pantalla ya lo
+    // deshabilita, pero la regla tiene que valer también acá: el botón gris
+    // se salta recargando la página en el momento justo, y el mozo termina
+    // caminando hasta una mesa que recién se sentó.
+    if (parsed.data.reason === 'BILL') {
+      // Lo que está en el carrito todavía no salió, pero ya es consumo a la
+      // vista: la mesa eligió y está por mandarlo.
+      let consumo = session.value.cart.lines.length > 0;
+
+      if (!consumo) {
+        const placed = await this.orders.store.listBySession(scope.tenantId, sessionId);
+        consumo =
+          placed.isOk() && placed.value.some((order) => order.status !== 'CANCELLED');
+      }
+
+      if (!consumo) {
+        throw new HttpException({ kind: 'NOTHING_ORDERED' }, HttpStatus.CONFLICT);
+      }
+    }
+
+    // Un llamado a la vez: tres avisos juntos de la misma mesa no le dicen al
+    // mozo cuál atender. Repetir el que ya está pedido no es un error — dos
+    // teléfonos de la mesa pueden tocar el mismo timbre — así que sólo se
+    // rechaza pedir uno distinto.
+    if (waiting.length > 0 && !waiting.some((call) => call.reason === parsed.data.reason)) {
+      throw new HttpException({ kind: 'ALREADY_CALLING' }, HttpStatus.CONFLICT);
     }
 
     const raised = await this.calls.store.raise({

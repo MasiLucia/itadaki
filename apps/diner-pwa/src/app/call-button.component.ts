@@ -301,9 +301,19 @@ export class CallButtonComponent {
     return waiting.size > 0 && !waiting.has(reason);
   }
 
+  /**
+   * Si esta persona todavía no se sentó, no pidió nada.
+   *
+   * Mirar sólo lo que consumió la mesa dejaba pedir la cuenta a quien abrió
+   * el QR desde la vereda: la mesa venía comiendo de antes, así que el total
+   * daba mayor a cero aunque quien tocaba el timbre no se hubiera unido.
+   */
   private tableHasOrdered(): boolean {
+    if (!this.session.isJoined()) return false;
+
     const state = this.session.session();
     if (state === null) return false;
+
     const cart = state.lines.length > 0;
     const placed = (state.placedTotal?.amountInMinorUnits ?? 0) > 0;
     return cart || placed;

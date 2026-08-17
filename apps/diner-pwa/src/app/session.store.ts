@@ -149,7 +149,6 @@ export class SessionStore {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw === null) return;
       const saved = JSON.parse(raw) as { sessionId: string; dinerId: string };
-      this.myDinerId.set(saved.dinerId);
 
       void this.refresh(saved.sessionId).then(() => {
         // A meal that already ended is not worth rejoining: restoring it puts
@@ -158,6 +157,17 @@ export class SessionStore {
           this.forget();
           return;
         }
+
+        // El comensal se marca recién con la mesa ya confirmada por el
+        // servidor. Marcarlo antes daba por sentada una mesa que todavía no
+        // había respondido — o que ya no existía — y el timbre aparecía sobre
+        // esa mesa fantasma, dejando pedir la cuenta a quien nunca se sentó.
+        if (this.session() === null) {
+          this.forget();
+          return;
+        }
+
+        this.myDinerId.set(saved.dinerId);
         this.listen(saved.sessionId);
       });
     } catch {
