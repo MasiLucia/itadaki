@@ -1,4 +1,12 @@
-import { DEFAULT_CATEGORY, csvToMenuText, htmlToMenuText, parseMenuText } from './menu-import';
+import {
+  DEFAULT_CATEGORY,
+  MAX_CATEGORY,
+  MAX_DESCRIPTION,
+  MAX_NAME,
+  csvToMenuText,
+  htmlToMenuText,
+  parseMenuText,
+} from './menu-import';
 
 describe('leer una carta pegada de otro lado', () => {
   it('lee un plato con su precio', () => {
@@ -255,5 +263,49 @@ describe('leer una carta publicada en una página', () => {
 
   it('no devuelve nada de una página que arma la carta con JavaScript', () => {
     expect(htmlToMenuText('<div id="menu"></div><script>render()</script>')).toBe('');
+  });
+});
+
+/**
+ * Lo que el servidor no acepta no puede llegar hasta el guardado: rebotaba la
+ * carta entera nombrando un plato y nada más, con los sesenta ya pegados.
+ */
+describe('acomodar la carta a lo que entra', () => {
+  it('corta el nombre largo por la última palabra y manda el resto a la descripción', () => {
+    const largo = 'Milanesa napolitana con papas fritas y ensalada mixta de estación 8500';
+    const dish = parseMenuText(largo).dishes[0];
+
+    expect(dish?.name.length).toBeLessThanOrEqual(MAX_NAME);
+    expect(dish?.name).toBe('Milanesa napolitana con papas fritas y ensalada mixta de');
+    expect(dish?.description).toBe('estación');
+    expect(dish?.priceMinor).toBe(850_000);
+  });
+
+  it('corta una sola palabra larguísima aunque no tenga dónde', () => {
+    const dish = parseMenuText(`${'a'.repeat(80)} 2600`).dishes[0];
+
+    expect(dish?.name).toHaveLength(MAX_NAME);
+  });
+
+  it('no toca lo que ya entra', () => {
+    const dish = parseMenuText('Flan - con dulce de leche 2600').dishes[0];
+
+    expect(dish?.name).toBe('Flan');
+    expect(dish?.description).toBe('con dulce de leche');
+  });
+
+  it('acorta la descripción que se pasa, venga de donde venga', () => {
+    const dish = parseMenuText(`Provoleta - ${'ingrediente '.repeat(30)} 5200`).dishes[0];
+
+    expect(dish?.description.length).toBeLessThanOrEqual(MAX_DESCRIPTION);
+  });
+
+  it('acorta la sección larga y la deja igual en el plato que la usa', () => {
+    const { dishes, categories } = parseMenuText(
+      `${'Sección de la casa '.repeat(5)}\nFlan 2600`,
+    );
+
+    expect(categories[0]?.length).toBeLessThanOrEqual(MAX_CATEGORY);
+    expect(dishes[0]?.category).toBe(categories[0]);
   });
 });

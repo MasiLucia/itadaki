@@ -12,7 +12,7 @@ import { type ImageEditParams } from '@itadaki/catalog/domain';
 import { ImageEditorComponent } from '@itadaki/shared/ui-image-editor';
 import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
 import { DecimalPipe } from '@angular/common';
-import { csvToMenuText, parseMenuText } from '@itadaki/catalog/domain';
+import { MAX_DISHES, csvToMenuText, parseMenuText } from '@itadaki/catalog/domain';
 import { QrSheetComponent } from './qr-sheet.component';
 import { MetricsComponent } from './metrics.component';
 
@@ -703,6 +703,13 @@ const ROLE_NAMES: Record<string, string> = {
                 <strong>{{ parsed().categories.length }}</strong> secciones
               </p>
 
+              @if (parsed().dishes.length > maxDishes) {
+                <p class="status error">
+                  Entran {{ maxDishes }} platos por vez y hay
+                  {{ parsed().dishes.length }} — subí la carta en dos tandas.
+                </p>
+              }
+
               @if (parsed().skipped.length > 0) {
                 <p class="status error">
                   {{ parsed().skipped.length }} líneas no se entendieron — revisalas y
@@ -742,7 +749,11 @@ const ROLE_NAMES: Record<string, string> = {
             <button
               type="button"
               class="create"
-              [disabled]="parsed().dishes.length === 0 || importing()"
+              [disabled]="
+                parsed().dishes.length === 0 ||
+                parsed().dishes.length > maxDishes ||
+                importing()
+              "
               (click)="confirmImport()"
             >
               {{ importing() ? 'Cargando…' : 'Agregar ' + parsed().dishes.length + ' platos' }}
@@ -813,6 +824,7 @@ export class AdminComponent {
   protected readonly importText = signal('');
   protected readonly importUrl = signal('');
   protected readonly fetching = signal(false);
+  protected readonly maxDishes = MAX_DISHES;
   protected readonly importing = signal(false);
   protected readonly importResult = signal<string | null>(null);
 

@@ -1,4 +1,12 @@
-import { ALLERGENS, DIET_TAGS, htmlToMenuText } from '@itadaki/catalog/domain';
+import {
+  ALLERGENS,
+  DIET_TAGS,
+  MAX_CATEGORY,
+  MAX_DESCRIPTION,
+  MAX_DISHES,
+  MAX_NAME,
+  htmlToMenuText,
+} from '@itadaki/catalog/domain';
 import {
   Body,
   Controller,
@@ -472,17 +480,19 @@ export class MenuController {
   @Post('import')
   async importMenu(@Body() body: unknown, @TenantId() tenantId: string) {
     const schema = z.object({
+      // Los mismos topes que el importador ya aplicó en el navegador: acá se
+      // vuelven a exigir porque esto es el borde, y el borde no confía.
       dishes: z
         .array(
           z.object({
-            name: z.string().min(1).max(60),
-            description: z.string().max(140).default(''),
+            name: z.string().min(1).max(MAX_NAME),
+            description: z.string().max(MAX_DESCRIPTION).default(''),
             priceMinor: z.number().int().min(0),
-            category: z.string().min(1).max(40),
+            category: z.string().min(1).max(MAX_CATEGORY),
           }),
         )
         .min(1)
-        .max(300),
+        .max(MAX_DISHES),
     });
 
     const parsed = schema.safeParse(body);

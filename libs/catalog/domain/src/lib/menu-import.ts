@@ -82,6 +82,53 @@ function splitNameAndDescription(text: string): { name: string; description: str
   };
 }
 
+/**
+ * Lo que entra en cada campo, que es lo que el servidor acepta.
+ *
+ * Vive acá y no sólo en la API porque una carta bajada de una web trae el
+ * plato y su explicación en el mismo renglón sin separador —"Milanesa
+ * napolitana con papas fritas y ensalada mixta de estación"— y pasarse por
+ * dos caracteres rebotaba la carta entera con un error que nombraba el plato
+ * número diez y nada más. Cortar acá lo deja visible en la vista previa, que
+ * es donde se puede arreglar.
+ */
+export const MAX_NAME = 60;
+export const MAX_DESCRIPTION = 140;
+export const MAX_CATEGORY = 40;
+
+/**
+ * Cuántos platos entran en una importación.
+ *
+ * Este no se puede recortar sin perder platos, así que se avisa antes de
+ * guardar y la carta se sube en dos veces.
+ */
+export const MAX_DISHES = 300;
+
+/** Corta por la última palabra entera que entre, para no partir a la mitad. */
+function trimTo(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+
+  const cut = text.slice(0, limit);
+  const lastSpace = cut.lastIndexOf(' ');
+  // Sin espacios es una sola palabra larguísima: ahí el corte duro es lo único.
+  return (lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut).trim();
+}
+
+/**
+ * Acomoda un plato a lo que entra, sin tirar lo que sobra.
+ *
+ * Lo que no cabe en el nombre pasa a la descripción en vez de perderse: en un
+ * renglón sin separador el nombre real está al principio y lo que sigue lo
+ * explica, que es exactamente la división que el corte termina haciendo.
+ */
+function fitToLimits(name: string, description: string): { name: string; description: string } {
+  const shortName = trimTo(name, MAX_NAME);
+  const overflow = name.slice(shortName.length).trim();
+  const joined = overflow === '' ? description : `${overflow} ${description}`.trim();
+
+  return { name: shortName, description: trimTo(joined, MAX_DESCRIPTION) };
+}
+
 export function parseMenuText(text: string): ParsedMenu {
   const dishes: ParsedDish[] = [];
   const categories: string[] = [];
@@ -102,7 +149,7 @@ export function parseMenuText(text: string): ParsedMenu {
     // Sin precio al final es el nombre de una sección: así es como se ve
     // "ENTRADAS" o "Parrilla" en cualquier carta.
     if (priceMatch === null) {
-      const name = line.replace(/[:\s]+$/, '').trim();
+      const name = trimTo(line.replace(/[:\s]+$/, '').trim(), MAX_CATEGORY);
       if (name === '') continue;
 
       currentCategory = name;
@@ -125,7 +172,8 @@ export function parseMenuText(text: string): ParsedMenu {
       continue;
     }
 
-    const { name, description } = splitNameAndDescription(cleaned);
+    const split = splitNameAndDescription(cleaned);
+    const { name, description } = fitToLimits(split.name, split.description);
     if (name === '') {
       skipped.push({ raw: line, lineNumber, problem: 'SIN_NOMBRE', dish: null });
       continue;
