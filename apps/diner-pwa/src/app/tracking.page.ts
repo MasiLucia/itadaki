@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
   inject,
 } from '@angular/core';
@@ -115,26 +114,12 @@ const STEP_LABELS: Record<string, { title: string; hint: string }> = {
 export class TrackingPage {
   protected readonly store = inject(TrackingStore);
   protected readonly session = inject(SessionStore);
-  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly steps = TRACKING_STEPS;
 
-  protected readonly sessionId = computed(() => this.session.session()?.id ?? null);
-
-  constructor() {
-    const id = this.sessionId();
-    if (id !== null) {
-      void this.store.load(id);
-    }
-
-    // Kitchen advances the ticket; this screen follows the same socket the
-    // session already holds open rather than polling.
-    const stop = this.session.onOrderChanged(() => {
-      const current = this.sessionId();
-      if (current !== null) void this.store.load(current);
-    });
-    this.destroyRef.onDestroy(stop);
-  }
+  // Cargar y seguir el socket es cosa del store, que lo hace para toda la
+  // mesa: si dependiera de esta pantalla, sólo sabría del pedido quien la
+  // hubiera abierto.
 
   /**
    * Every dish the table is waiting on, each with its own progress.

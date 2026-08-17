@@ -1,5 +1,6 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { ApiClient } from './api-client';
+import { SessionStore } from './session.store';
 
 export interface TrackedItem {
   readonly id: string;
@@ -26,9 +27,18 @@ const MINUTES_REMAINING: Record<string, number> = {
   READY: 0,
 };
 
+/**
+ * Lo que la mesa tiene en cocina.
+ *
+ * Se carga sola en cuanto hay sesión, y no cuando alguien abre la pantalla de
+ * estado: antes sólo la conocía quien había tocado "enviar" desde su propio
+ * teléfono — el resto de la mesa veía el carrito vaciarse y no tenía por dónde
+ * entrar a mirar el pedido. El pedido es de la mesa, no del que lo mandó.
+ */
 @Injectable({ providedIn: 'root' })
 export class TrackingStore {
   private readonly api = inject(ApiClient);
+  private readonly session = inject(SessionStore);
 
   readonly orders = signal<readonly TrackedOrder[]>([]);
   readonly busy = signal(false);
@@ -58,6 +68,21 @@ export class TrackingStore {
 
     return Math.max(...pending.map((order) => MINUTES_REMAINING[order.status] ?? 0));
   });
+
+  constructor() {
+    // La sesión aparece al entrar a la mesa y al recuperarla tras un reload.
+    effect(() => {
+      const sessionId = this.session.session()?.id;
+      if (sessionId !== undefined) void this.load(sessionId);
+    });
+
+    // La cocina avanza el pedido por el mismo socket que la sesión ya tiene
+    // abierto: cada teléfono de la mesa se entera, no sólo el que envió.
+    this.session.onOrderChanged(() => {
+      const sessionId = this.session.session()?.id;
+      if (sessionId !== undefined) void this.load(sessionId);
+    });
+  }
 
   async load(sessionId: string): Promise<void> {
     if (this.api.tableToken() === null) return;

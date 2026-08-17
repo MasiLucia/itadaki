@@ -235,6 +235,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Lo que ya está en cocina se lee, pero no compite con lo que falta enviar:
+   la acción de esta pantalla sigue siendo mandar el resto. */
+.total-line.placed {
+  font-size: 0.92rem;
+  color: var(--itadaki-ink-soft);
+  margin-bottom: 0.35rem;
+}
+
 .cta {
   width: 100%;
   background: var(--itadaki-accent);

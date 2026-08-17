@@ -8,6 +8,7 @@ import { DINER_PALETTE } from '@itadaki/shared/ui-tokens';
 import { SessionStore, type SessionLine } from './session.store';
 import { MoneyPipe } from './money.pipe';
 import { OrderService } from './order.service';
+import { TrackingStore } from './tracking.store';
 
 @Component({
   selector: 'itd-cart',
@@ -89,8 +90,17 @@ import { OrderService } from './order.service';
       </main>
 
       <footer class="foot">
+        <!-- Lo que ya está en cocina no desaparece de la pantalla al enviar.
+             Sin esta línea, la mesa que acababa de pedir veía "Total de la
+             mesa $ 0" y parecía que se había perdido el pedido. -->
+        @if (placedTotal() > 0) {
+          <div class="total-line placed">
+            <span>Ya en cocina</span>
+            <span>{{ formatMinor(placedTotal()) }}</span>
+          </div>
+        }
         <div class="total-line">
-          <span>Total de la mesa</span>
+          <span>{{ placedTotal() > 0 ? 'Sin enviar' : 'Total de la mesa' }}</span>
           <span>{{ formatMinor(tableTotal()) }}</span>
         </div>
 
@@ -133,6 +143,14 @@ import { OrderService } from './order.service';
                 <p class="sent-note" role="status">
                   Alguien de la mesa envió el pedido a la cocina
                 </p>
+              }
+              @if (tracking.hasOrders()) {
+                <!-- El pedido es de la mesa: seguirlo no puede depender de
+                     quién apretó enviar. Antes, el que no lo mandó veía el
+                     carrito vacío y ninguna puerta al estado. -->
+                <a class="cta cta-link" routerLink="/estado">
+                  Seguir el pedido de la mesa →
+                </a>
               }
               <a class="link foot-link" routerLink="/cuenta">Ver la cuenta</a>
             }
@@ -237,12 +255,18 @@ export class CartPage {
   protected readonly cart = inject(CartStore);
   protected readonly orders = inject(OrderService);
   protected readonly session = inject(SessionStore);
+  protected readonly tracking = inject(TrackingStore);
 
   protected readonly tableTotal = computed(() =>
     (this.session.session()?.subtotals ?? []).reduce(
       (total, entry) => total + entry.subtotal.amountInMinorUnits,
       0,
     ),
+  );
+
+  /** Lo que la mesa ya mandó a cocina, que sigue siendo plata que va a pagar. */
+  protected readonly placedTotal = computed(
+    () => this.session.session()?.placedTotal?.amountInMinorUnits ?? 0,
   );
 
   protected linesOf(dinerId: string): readonly SessionLine[] {
