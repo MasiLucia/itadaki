@@ -117,6 +117,18 @@ export class BillsController {
   @TableScoped()
   @Post('close/:sessionId')
   async close(@Param('sessionId') sessionId: string, @Scope() scope: DinerScope) {
+    return this.describe(await this.raiseBill(scope, sessionId), 'ARS');
+  }
+
+  /**
+   * Arma la cuenta de la mesa con lo que consumió.
+   *
+   * La levantan dos caminos: el comensal al abrir la pantalla de la cuenta, y
+   * el mozo al cobrar una mesa que nunca la pidió — que pasa siempre con la
+   * gente que come, paga en efectivo y se va sin tocar el teléfono. Antes ese
+   * cobro no tenía documento y la mesa se liberaba sin registrar la plata.
+   */
+  private async raiseBill(scope: DinerScope, sessionId: string) {
     const tenantId = scope.tenantId;
     const state = await this.sessionInScope(scope, sessionId);
 
@@ -183,7 +195,7 @@ export class BillsController {
     if (result.isErr()) {
       throw new HttpException(result.error, HttpStatus.CONFLICT);
     }
-    return this.describe(result.value, 'ARS');
+    return result.value;
   }
 
   @Public()
@@ -222,17 +234,17 @@ export class BillsController {
   async settle(@Param('sessionId') sessionId: string, @Scope() scope: DinerScope) {
     const state = await this.sessionInScope(scope, sessionId);
 
+    // La mesa que nunca pidió la cuenta igual consumió: se arma acá y se cobra,
+    // en vez de liberarla sin registrar la plata.
     const found = await this.bills.store.findBySession(scope.tenantId, sessionId);
-    if (found.isErr()) {
-      throw new HttpException(found.error, HttpStatus.NOT_FOUND);
-    }
+    const bill = found.isErr() ? await this.raiseBill(scope, sessionId) : found.value;
 
-    if (isSettled(found.value)) {
-      return this.describe(found.value, 'ARS');
+    if (isSettled(bill)) {
+      return this.describe(bill, 'ARS');
     }
 
     const settled = await this.bills.store.save(scope.tenantId, {
-      ...found.value,
+      ...bill,
       status: 'SETTLED',
     });
     if (settled.isErr()) {

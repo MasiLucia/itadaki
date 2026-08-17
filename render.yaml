@@ -44,6 +44,14 @@ services:
       - key: DINER_APP_URL
         sync: false
 
+      # Si sentarse a una mesa exige el código que da el mozo. Apagado mientras
+      # se prueba: cada prueba mandaba a buscar el código al salón antes de
+      # poder pedir nada. Ponerlo en "1" antes de que haya un local de verdad
+      # usando esto — sin el código, una foto del QR alcanza para entrar a la
+      # mesa desde afuera.
+      - key: REQUIRE_JOIN_CODE
+        value: "0"
+
       # Sin proveedor de correo la API se niega a arrancar en producción: un
       # flujo de recuperación que no manda nada es peor que uno que falta.
       - key: RESEND_API_KEY

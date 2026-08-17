@@ -284,6 +284,22 @@
 
 /* Liberar debiendo se confirma en dos toques, con el monto en el botón: es
    lo último que ve el mozo antes de que la mesa deje de existir. */
+/* La pregunta y sus dos salidas, cuando se va a liberar sin cobrar. */
+.owing-card .release-ask {
+  margin: 0.35rem 0 0.3rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--itadaki-ink-soft);
+  text-align: right;
+}
+
+.owing-card .release-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .owing-card .release.confirm {
   background: var(--itadaki-status-late);
   color: white;

@@ -44,6 +44,20 @@ import { toMoneyDto, toOrderDto } from './contracts';
 /** A dónde apunta el QR de una invitación; el mismo destino que el impreso. */
 const DINER_APP_URL = process.env['DINER_APP_URL'] ?? 'http://localhost:4200';
 
+/**
+ * Si sentarse a una mesa exige el código que da el mozo.
+ *
+ * Apagado mientras se prueba: cada prueba obligaba a ir a buscar el código de
+ * la mesa al salón antes de poder pedir nada. Lo que protege es real —sin el
+ * código, cualquiera con una foto del QR entra a la mesa desde afuera— así que
+ * vuelve con `REQUIRE_JOIN_CODE=1` antes de que haya un local de verdad usando
+ * esto.
+ *
+ * El código se sigue generando y rotando: apagarlo es sólo dejar de pedirlo,
+ * no dejar de tenerlo.
+ */
+const REQUIRE_JOIN_CODE = process.env['REQUIRE_JOIN_CODE'] === '1';
+
 const joinSchema = z.object({
   /**
    * Signed by the table's own secret; carries both tenant and table.
@@ -326,9 +340,10 @@ export class SessionsController {
     // Quien llega con invitación no lo necesita: alguien de la mesa ya lo dejó
     // pasar, y eso es exactamente lo que la invitación prueba.
     const seated = await this.tables.find(tenantId, tableId);
-    const expectedCode = viaInvite
-      ? undefined
-      : (seated.isOk() ? (seated.value.joinCode ?? undefined) : undefined);
+    const expectedCode =
+      viaInvite || !REQUIRE_JOIN_CODE
+        ? undefined
+        : (seated.isOk() ? (seated.value.joinCode ?? undefined) : undefined);
 
     const run = joinTable({
       sessions: this.sessions.store,

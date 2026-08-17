@@ -50,13 +50,19 @@ const SUGGESTIONS = ['Ana', 'Beto', 'Cami', 'Dani', 'Eli', 'Fede', 'Gaby', 'Nico
         @if (table.invite() !== null) {
           <p class="code-hint invited">Te invitaron a la mesa — no hace falta código.</p>
         } @else {
-          <!-- Desde el primero: el código es de la mesa y existe antes de que
-               nadie escanee. Es lo único que separa a quien está sentado en el
-               salón de quien tiene una foto del QR en el teléfono. -->
+          <!-- El código es de la mesa y existe antes de que nadie escanee: es
+               lo único que separa a quien está sentado en el salón de quien
+               tiene una foto del QR en el teléfono.
+
+               No bloquea el botón porque el servidor decide si lo exige.
+               Con la exigencia apagada, entrar sin código funciona; con ella
+               prendida, el servidor lo rechaza y este mismo campo muestra por
+               qué. Una pantalla que adivine la regla por su cuenta se
+               desincroniza el día que la regla cambie. -->
           <label class="code-label" for="join-code">Código de la mesa</label>
           <p class="code-hint">
-            Te lo da el mozo al sentarte. Si ya hay alguien de tu mesa adentro,
-            te puede invitar desde su teléfono.
+            Si el mozo te dio uno al sentarte, ponelo acá. Si ya hay alguien de
+            tu mesa adentro, te puede invitar desde su teléfono.
           </p>
           <input
             id="join-code"
@@ -78,7 +84,7 @@ const SUGGESTIONS = ['Ana', 'Beto', 'Cami', 'Dani', 'Eli', 'Fede', 'Gaby', 'Nico
         <button
           type="submit"
           class="cta"
-          [disabled]="nickname().trim() === '' || !codeReady() || busy() || !puedeEntrar()"
+          [disabled]="nickname().trim() === '' || busy() || !puedeEntrar()"
         >
           {{ busy() ? 'Entrando…' : 'Entrar a la mesa →' }}
         </button>
@@ -96,10 +102,6 @@ export class JoinPage {
   protected readonly code = signal('');
   protected readonly busy = signal(false);
 
-  /** Con invitación no hay código que completar: ya viene autorizado. */
-  protected readonly codeReady = computed(
-    () => this.table.invite() !== null || this.code().length === 6,
-  );
 
   /**
    * Quien llega por invitación todavía no tiene token de mesa — lo recibe al

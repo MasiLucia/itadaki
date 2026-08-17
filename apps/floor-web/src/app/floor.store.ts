@@ -289,12 +289,8 @@ export class FloorStore {
     });
     if (this.auth.expired(response)) return;
 
-    // 404: la mesa nunca pidió la cuenta, así que no hay documento que cerrar.
-    // Liberarla igual es lo que el mozo venía a hacer.
-    if (response.status === 404) {
-      await this.releaseTable(sessionId);
-      return;
-    }
+    // La mesa que nunca pidió la cuenta la arma el servidor al cobrar: antes
+    // acá se caía a liberarla, y esa plata se cobraba sin quedar registrada.
     if (response.ok) await this.refresh();
   }
 

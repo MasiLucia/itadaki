@@ -130,13 +130,24 @@ const CALL_LABELS: Record<string, string> = {
                 </button>
 
                 @if (confirming() === mesa.sessionId) {
-                  <button
-                    type="button"
-                    class="release confirm"
-                    (click)="release(mesa.sessionId)"
-                  >
-                    Debe {{ money(mesa.owed) }} · liberar igual
-                  </button>
+                  <!-- La confirmación es una pregunta con dos salidas. Un solo
+                       botón que cambiaba de texto a "Debe $X · liberar igual"
+                       se leía como un cartel sobre la deuda y no como algo que
+                       había que volver a tocar: parecía que el primer toque no
+                       había hecho nada. -->
+                  <p class="release-ask">¿Liberar sin cobrar los {{ money(mesa.owed) }}?</p>
+                  <div class="release-row">
+                    <button
+                      type="button"
+                      class="release confirm"
+                      (click)="release(mesa.sessionId)"
+                    >
+                      Sí, liberar
+                    </button>
+                    <button type="button" class="release" (click)="confirming.set(null)">
+                      No
+                    </button>
+                  </div>
                 } @else {
                   <button
                     type="button"
