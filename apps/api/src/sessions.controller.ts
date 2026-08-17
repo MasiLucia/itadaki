@@ -36,6 +36,7 @@ import { RateLimit } from './rate-limit.guard';
 import { database } from './database';
 import { CatalogService } from './catalog.service';
 import { OrdersService } from './orders.service';
+import { CallsService } from './calls.service';
 import { RealtimeGateway } from './realtime.gateway';
 import { SessionsService } from './sessions.service';
 import { toMoneyDto, toOrderDto } from './contracts';
@@ -138,6 +139,7 @@ export class SessionsController {
     private readonly catalog: CatalogService,
     private readonly orders: OrdersService,
     private readonly realtime: RealtimeGateway,
+    private readonly calls: CallsService,
   ) {}
 
   /** El código de cada mesa vive acá, no en la sesión. */
@@ -669,7 +671,11 @@ export class SessionsController {
     // Antes de cerrarla, de qué mesa era: después la sesión ya no la nombra.
     const before = await this.sessions.store.findById(tenantId, sessionId);
 
-    const run = closeTable({ sessions: this.sessions.store, events: this.realtime });
+    const run = closeTable({
+      sessions: this.sessions.store,
+      events: this.realtime,
+      calls: this.calls.store,
+    });
     const result = await run({ tenantId, sessionId });
 
     if (result.isErr()) {

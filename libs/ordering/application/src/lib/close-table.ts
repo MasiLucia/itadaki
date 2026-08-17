@@ -1,6 +1,11 @@
 import { closeSession } from '@itadaki/ordering/domain';
 import { type Result, err, ok } from '@itadaki/shared/domain';
-import { type SessionEventPublisher, type SessionReader, type SessionWriter } from './session-ports';
+import {
+  type CallCloser,
+  type SessionEventPublisher,
+  type SessionReader,
+  type SessionWriter,
+} from './session-ports';
 import { type OrderRepositoryError } from './ports';
 
 export interface CloseTableCommand {
@@ -20,6 +25,8 @@ export interface CloseTableCommand {
 export function closeTable(deps: {
   sessions: SessionReader & SessionWriter;
   events: SessionEventPublisher;
+  calls: CallCloser;
+  now?: () => Date;
 }) {
   return async (command: CloseTableCommand): Promise<Result<void, OrderRepositoryError>> => {
     const found = await deps.sessions.findById(command.tenantId, command.sessionId);
@@ -39,6 +46,15 @@ export function closeTable(deps: {
     if (saved.isErr()) {
       return err(saved.error);
     }
+
+    // Una mesa que terminó no sigue pidiendo la cuenta. Si esto falla, la mesa
+    // igual está cerrada: dejarla abierta por un timbre sin apagar sería peor,
+    // porque el próximo que escanee ese QR entraría a la sesión anterior.
+    await deps.calls.closeForSession(
+      command.tenantId,
+      command.sessionId,
+      deps.now?.() ?? new Date(),
+    );
 
     // Phones still on this table need to know it ended, or they keep showing a
     // cart they can no longer add to.

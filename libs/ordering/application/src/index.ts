@@ -20,6 +20,7 @@ export {
   type SessionWriter,
   type SessionEvent,
   type SessionEventPublisher,
+  type CallCloser,
 } from './lib/session-ports';
 export {
   joinTable,

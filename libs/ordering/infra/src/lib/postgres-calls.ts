@@ -145,4 +145,34 @@ export class PostgresCallStore {
       return err({ kind: 'STORAGE_FAILURE', detail: String(error) });
     }
   }
+
+  /**
+   * Cierra lo que la mesa estaba pidiendo cuando la mesa termina.
+   *
+   * Un llamado sin atender no se iba nunca: la mesa que pedía la cuenta se
+   * quedaba con el timbre encendido en todos sus teléfonos, y el salón seguía
+   * viendo el pedido de una mesa que ya se fue. Cobrar y liberar pasan los dos
+   * por acá, así que no hay forma de cerrar una mesa y olvidarse de esto.
+   */
+  async closeForSession(
+    tenantId: string,
+    sessionId: string,
+    at: Date,
+  ): Promise<Result<number, CallError>> {
+    try {
+      const closed = await this.db.withTenant(tenantId, async (client) => {
+        const result = await client.query(
+          `UPDATE table_calls
+              SET status = 'ACKNOWLEDGED', acknowledged_at = $2
+            WHERE session_id = $1 AND status = 'PENDING'`,
+          [sessionId, at],
+        );
+        return result.rowCount ?? 0;
+      });
+
+      return ok(closed);
+    } catch (error) {
+      return err({ kind: 'STORAGE_FAILURE', detail: String(error) });
+    }
+  }
 }

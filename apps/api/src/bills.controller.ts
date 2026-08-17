@@ -34,6 +34,7 @@ import { database } from './database';
 import { BillsService } from './bills.service';
 import { SessionsService } from './sessions.service';
 import { OrdersService } from './orders.service';
+import { CallsService } from './calls.service';
 import { RealtimeGateway } from './realtime.gateway';
 import { toMoneyDto } from './contracts';
 
@@ -79,6 +80,7 @@ export class BillsController {
     private readonly sessions: SessionsService,
     private readonly orders: OrdersService,
     private readonly realtime: RealtimeGateway,
+    private readonly calls: CallsService,
   ) {}
 
   /** Cobrar termina la mesa, y una mesa que termina estrena código. */
@@ -242,6 +244,7 @@ export class BillsController {
     const closed = await closeTable({
       sessions: this.sessions.store,
       events: this.realtime,
+      calls: this.calls.store,
     })({ tenantId: scope.tenantId, sessionId });
 
     if (closed.isErr()) {

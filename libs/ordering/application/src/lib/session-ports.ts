@@ -53,3 +53,14 @@ export interface SessionEvent {
 export interface SessionEventPublisher {
   sessionChanged(event: SessionEvent): Promise<void>;
 }
+
+/**
+ * Cierra los llamados que la mesa dejó abiertos.
+ *
+ * Una mesa que termina no sigue pidiendo nada: sin esto, el timbre quedaba
+ * encendido para siempre en los teléfonos de esa mesa y el salón veía el
+ * llamado de gente que ya se había ido.
+ */
+export interface CallCloser {
+  closeForSession(tenantId: string, sessionId: string, at: Date): Promise<unknown>;
+}

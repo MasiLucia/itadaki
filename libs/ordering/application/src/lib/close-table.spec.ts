@@ -3,6 +3,7 @@ import { type Result, err, ok } from '@itadaki/shared/domain';
 import { closeTable } from './close-table';
 import { type OrderRepositoryError } from './ports';
 import {
+  type CallCloser,
   type SessionEvent,
   type SessionEventPublisher,
   type SessionReader,
@@ -69,12 +70,20 @@ class FakeEvents implements SessionEventPublisher {
   }
 }
 
+class FakeCalls implements CallCloser {
+  readonly closed: string[] = [];
+  async closeForSession(_tenantId: string, sessionId: string): Promise<unknown> {
+    this.closed.push(sessionId);
+    return undefined;
+  }
+}
+
 describe('closeTable', () => {
   it('closes an open session so the table is free again', async () => {
     const sessions = new FakeSessions(sessionAt('OPEN'));
     const events = new FakeEvents();
 
-    const result = await closeTable({ sessions, events })({ tenantId: 't1', sessionId: 's1' });
+    const result = await closeTable({ sessions, events, calls: new FakeCalls() })({ tenantId: 't1', sessionId: 's1' });
 
     expect(result.isOk()).toBe(true);
     expect(sessions.saved?.session.status).toBe('CLOSED');
@@ -82,7 +91,7 @@ describe('closeTable', () => {
 
   it('frees the table for the next group', async () => {
     const sessions = new FakeSessions(sessionAt('OPEN'));
-    await closeTable({ sessions, events: new FakeEvents() })({ tenantId: 't1', sessionId: 's1' });
+    await closeTable({ sessions, events: new FakeEvents(), calls: new FakeCalls() })({ tenantId: 't1', sessionId: 's1' });
 
     // This is the bug it exists to prevent: the next scan must not find the
     // previous group's session waiting for them.
@@ -93,7 +102,7 @@ describe('closeTable', () => {
 
   it('keeps the diners and cart, only the status changes', async () => {
     const sessions = new FakeSessions(sessionAt('OPEN'));
-    await closeTable({ sessions, events: new FakeEvents() })({ tenantId: 't1', sessionId: 's1' });
+    await closeTable({ sessions, events: new FakeEvents(), calls: new FakeCalls() })({ tenantId: 't1', sessionId: 's1' });
 
     // The session is history now, and the bill references it.
     expect(sessions.saved?.session.diners).toHaveLength(1);
@@ -102,7 +111,7 @@ describe('closeTable', () => {
 
   it('tells the phones still on that table', async () => {
     const events = new FakeEvents();
-    await closeTable({ sessions: new FakeSessions(sessionAt('OPEN')), events })({
+    await closeTable({ sessions: new FakeSessions(sessionAt('OPEN')), events, calls: new FakeCalls() })({
       tenantId: 't1',
       sessionId: 's1',
     });
@@ -115,17 +124,43 @@ describe('closeTable', () => {
     const sessions = new FakeSessions(sessionAt('CLOSED'));
     const events = new FakeEvents();
 
-    const result = await closeTable({ sessions, events })({ tenantId: 't1', sessionId: 's1' });
+    const result = await closeTable({ sessions, events, calls: new FakeCalls() })({ tenantId: 't1', sessionId: 's1' });
 
     expect(result.isOk()).toBe(true);
     expect(sessions.writes).toBe(0);
     expect(events.published).toHaveLength(0);
   });
 
+  /**
+   * El timbre quedaba encendido para siempre: la mesa pedía la cuenta, nadie
+   * atendía ese llamado, y cualquier teléfono que volviera a entrar lo seguía
+   * viendo activo. El salón, igual, con el pedido de gente que ya se fue.
+   */
+  it('apaga lo que la mesa haya dejado pidiendo', async () => {
+    const calls = new FakeCalls();
+    await closeTable({ sessions: new FakeSessions(sessionAt('OPEN')), events: new FakeEvents(), calls })({
+      tenantId: 't1',
+      sessionId: 's1',
+    });
+
+    expect(calls.closed).toEqual(['s1']);
+  });
+
+  it('no toca los llamados de una mesa que ya estaba cerrada', async () => {
+    const calls = new FakeCalls();
+    await closeTable({ sessions: new FakeSessions(sessionAt('CLOSED')), events: new FakeEvents(), calls })({
+      tenantId: 't1',
+      sessionId: 's1',
+    });
+
+    expect(calls.closed).toEqual([]);
+  });
+
   it('reports a session that does not exist', async () => {
     const result = await closeTable({
       sessions: new FakeSessions(null),
       events: new FakeEvents(),
+      calls: new FakeCalls(),
     })({ tenantId: 't1', sessionId: 'missing' });
 
     expect(result.isErr()).toBe(true);
