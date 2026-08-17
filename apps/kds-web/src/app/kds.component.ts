@@ -11,7 +11,10 @@ import {
 import { AuthStore, LoginComponent } from '@itadaki/shared/ui-auth';
 import {
   type BoardLayout,
+  type CardBatch,
+  type OrderStatus,
   type TableCard,
+  canTransition,
   groupByTable,
   layoutFor,
   splitByUrgency,
@@ -126,52 +129,77 @@ const SLA_LATE = 15;
                   <span class="ticket-time">{{ waited(ticket) }}</span>
                 </header>
 
-                @if (ticket.ticketCount > 1) {
-                  <!-- La mesa agregó algo después del primer envío. Sin esto,
-                       los platos nuevos aparecerían mezclados sin aviso. -->
-                  <p class="ticket-added">agregó · {{ ticket.ticketCount }} envíos</p>
-                }
-
-                <ul class="ticket-items">
-                  @for (item of visibleItems(ticket); track item.orderId + item.id) {
-                    <li class="ticket-item" [attr.data-item-status]="item.status">
-                      <span class="qty">{{ item.quantity }}</span>
-                      <!-- La estación cierra el bloque del plato, debajo del
-                           nombre y de la nota: es un dato del plato, no una
-                           acción. Al lado del nombre se leía como parte de él. -->
-                      <span class="item-body">
-                        <span class="item-name">{{ item.name }}</span>
-                        @if (item.notes !== '') {
-                          <span class="item-note">{{ item.notes }}</span>
-                        }
-                        <span class="item-station" [attr.data-station]="item.station">
-                          {{ stationLabel(item.station) }}
-                        </span>
+                <!-- Un bloque por envío, cada uno con su estado.
+                     Juntarlos bajo el estado de la mesa mentía: lo que la
+                     cocina ya había aceptado volvía a verse como nuevo en
+                     cuanto alguien de la mesa agregaba un plato. -->
+                @for (batch of visibleBatches(ticket); track batch.orderId) {
+                  @if (ticket.batches.length > 1) {
+                    <div class="batch-head">
+                      <span class="batch-name">{{ batch.number }}º envío</span>
+                      <span class="batch-stage" [attr.data-status]="batch.status">
+                        {{ columnLabel(batch.status) }}
                       </span>
-                      <!-- Sólo la acción contra el margen derecho, siempre en
-                           el mismo lugar: el botón entre medio se corría según
-                           lo largo que fuera el nombre.
-
-                           Each dish carries its own stage: a cook can send the
-                           empanadas out while the roast is still cooking. -->
-                      <span class="item-side">
-                        @if (nextFor(item.status); as step) {
-                          <button
-                            type="button"
-                            class="item-btn"
-                            (click)="advanceItem(item.orderId, item.id, step.next)"
-                          >
-                            {{ step.action }}
-                          </button>
-                        } @else {
-                          <!-- READY no es entregado: el plato está en la
-                               barra esperando que el mozo lo lleve. -->
-                          <span class="item-done">{{ doneLabel(item.status) }}</span>
-                        }
-                      </span>
-                    </li>
+                      <span class="batch-time">{{ waitedSince(batch.placedAt) }}</span>
+                    </div>
                   }
-                </ul>
+
+                  <ul class="ticket-items">
+                    @for (item of batch.items; track item.orderId + item.id) {
+                      <li class="ticket-item" [attr.data-item-status]="item.status">
+                        <span class="qty">{{ item.quantity }}</span>
+                        <!-- La estación cierra el bloque del plato, debajo del
+                             nombre y de la nota: es un dato del plato, no una
+                             acción. Al lado del nombre se leía como parte de él. -->
+                        <span class="item-body">
+                          <span class="item-name">{{ item.name }}</span>
+                          @if (item.notes !== '') {
+                            <span class="item-note">{{ item.notes }}</span>
+                          }
+                          <span class="item-station" [attr.data-station]="item.station">
+                            {{ stationLabel(item.station) }}
+                          </span>
+                        </span>
+                        <!-- Sólo la acción contra el margen derecho, siempre en
+                             el mismo lugar: el botón entre medio se corría según
+                             lo largo que fuera el nombre.
+
+                             Each dish carries its own stage: a cook can send the
+                             empanadas out while the roast is still cooking. -->
+                        <span class="item-side">
+                          @if (nextFor(item.status); as step) {
+                            <button
+                              type="button"
+                              class="item-btn"
+                              (click)="advanceItem(item.orderId, item.id, step.next)"
+                            >
+                              {{ step.action }}
+                            </button>
+                          } @else {
+                            <!-- READY no es entregado: el plato está en la
+                                 barra esperando que el mozo lo lleve. -->
+                            <span class="item-done">{{ doneLabel(item.status) }}</span>
+                          }
+                        </span>
+                      </li>
+                    }
+                  </ul>
+
+                  <!-- Con varios envíos, el botón del envío es el que sirve:
+                       aceptar lo que acaba de entrar sin tocar lo que ya
+                       está en la plancha. -->
+                  @if (ticket.batches.length > 1) {
+                    @if (nextFor(batch.status); as step) {
+                      <button
+                        type="button"
+                        class="batch-btn"
+                        (click)="advanceBatch(batch, step.next)"
+                      >
+                        {{ step.action }} · {{ batch.number }}º envío →
+                      </button>
+                    }
+                  }
+                }
 
                 @if (column.next !== null) {
                   <button type="button" class="ticket-btn" (click)="advanceCard(ticket, column.next)">
@@ -288,19 +316,39 @@ const SLA_LATE = 15;
               <span class="feed-time">{{ waited(card) }}</span>
             </header>
 
-            <ul class="ticket-items">
-              @for (item of visibleItems(card); track item.orderId + item.id) {
-                <li class="ticket-item" [attr.data-item-status]="item.status">
-                  <span class="qty">{{ item.quantity }}</span>
-                  <span class="item-body">
-                    <span class="item-name">{{ item.name }}</span>
-                    @if (item.notes !== '') {
-                      <span class="item-note">{{ item.notes }}</span>
-                    }
+            @for (batch of visibleBatches(card); track batch.orderId) {
+              @if (card.batches.length > 1) {
+                <div class="batch-head">
+                  <span class="batch-name">{{ batch.number }}º envío</span>
+                  <span class="batch-stage" [attr.data-status]="batch.status">
+                    {{ columnLabel(batch.status) }}
                   </span>
-                </li>
+                  <span class="batch-time">{{ waitedSince(batch.placedAt) }}</span>
+                </div>
               }
-            </ul>
+
+              <ul class="ticket-items">
+                @for (item of batch.items; track item.orderId + item.id) {
+                  <li class="ticket-item" [attr.data-item-status]="item.status">
+                    <span class="qty">{{ item.quantity }}</span>
+                    <span class="item-body">
+                      <span class="item-name">{{ item.name }}</span>
+                      @if (item.notes !== '') {
+                        <span class="item-note">{{ item.notes }}</span>
+                      }
+                    </span>
+                  </li>
+                }
+              </ul>
+
+              @if (card.batches.length > 1) {
+                @if (nextFor(batch.status); as step) {
+                  <button type="button" class="batch-btn" (click)="advanceBatch(batch, step.next)">
+                    {{ step.action }} · {{ batch.number }}º envío →
+                  </button>
+                }
+              }
+            }
 
             @if (nextStepFor(card); as step) {
               <button type="button" class="ticket-btn" (click)="advanceCard(card, step.next)">
@@ -520,14 +568,29 @@ export class KdsComponent implements OnDestroy {
   }
 
   /**
-   * Avanza todos los platos de la mesa que todavía no llegaron a ese estado.
+   * Avanza los platos de la mesa que están justo un paso atrás.
+   *
+   * Sólo esos: antes intentaba mover todo lo que no estuviera ya en ese
+   * estado, incluido lo que iba más adelante, y el servidor rechazaba esas
+   * transiciones — el botón hacía menos de lo que decía, sin avisar.
    *
    * Recorre plato por plato porque una tarjeta puede juntar varios envíos, y
    * cada uno es una comanda distinta del lado del servidor.
    */
   protected async advanceCard(card: TableCard, next: string): Promise<void> {
-    for (const item of card.items) {
-      if (item.status !== next) {
+    await this.advanceItems(card.items, next);
+  }
+
+  /** Avanza un envío solo, sin tocar lo que la mesa ya tiene en marcha. */
+  protected async advanceBatch(batch: CardBatch, next: string): Promise<void> {
+    await this.advanceItems(batch.items, next);
+  }
+
+  private async advanceItems(items: TableCard['items'], next: string): Promise<void> {
+    for (const item of items) {
+      // La misma regla que aplica el servidor, para no mandar lo que va a
+      // rechazar: un plato en preparación no vuelve a aceptado.
+      if (canTransition(item.status as OrderStatus, next as OrderStatus)) {
         await this.store.advanceItem(item.orderId, item.id, next);
       }
     }
@@ -575,8 +638,12 @@ export class KdsComponent implements OnDestroy {
   }
 
   private minutesWaiting(card: TableCard): number {
-    if (card.placedAt === null) return 0;
-    return (this.tick() - new Date(card.placedAt).getTime()) / 60_000;
+    return this.minutesSince(card.placedAt);
+  }
+
+  private minutesSince(placedAt: string | null): number {
+    if (placedAt === null) return 0;
+    return (this.tick() - new Date(placedAt).getTime()) / 60_000;
   }
 
   protected slaOf(card: TableCard): 'ok' | 'warning' | 'late' {
@@ -587,10 +654,33 @@ export class KdsComponent implements OnDestroy {
   }
 
   protected waited(card: TableCard): string {
-    if (card.placedAt === null) return 'ahora';
-    const minutes = Math.floor(this.minutesWaiting(card));
+    return this.waitedSince(card.placedAt);
+  }
+
+  /** Hace cuánto entró un envío, que no es lo mismo que hace cuánto espera la mesa. */
+  protected waitedSince(placedAt: string | null): string {
+    if (placedAt === null) return 'ahora';
+    const minutes = Math.floor(this.minutesSince(placedAt));
     if (minutes < 1) return 'recién';
     return `${minutes} min`;
+  }
+
+  /**
+   * Los envíos de la mesa con platos para esta pantalla.
+   *
+   * En una pantalla de parrilla, un envío que sólo trajo bebidas no es un
+   * bloque vacío: directamente no está.
+   */
+  protected visibleBatches(card: TableCard): readonly CardBatch[] {
+    const station = this.activeStation();
+    if (station === 'ALL') return card.batches;
+
+    return card.batches
+      .map((batch) => ({
+        ...batch,
+        items: batch.items.filter((item) => item.station === station),
+      }))
+      .filter((batch) => batch.items.length > 0);
   }
 
   protected advance(orderId: string, next: string): void {

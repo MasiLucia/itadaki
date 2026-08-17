@@ -58,6 +58,45 @@ describe('lo que la cocina ve de una mesa', () => {
     expect(cards[0]?.items.map((i) => i.orderId)).toEqual(['o1', 'o2']);
   });
 
+  /**
+   * Lo que pasaba antes: la mesa con su comanda aceptada volvía a "nuevo" en
+   * cuanto alguien agregaba un plato, y la cocina veía como sin aceptar lo
+   * que ya había despachado.
+   */
+  it('deja a cada envío con su propio estado', () => {
+    const cards = groupByTable([
+      comanda({ id: 'o1', status: 'ACCEPTED', items: [plato('i1', 'ACCEPTED', 'bife')] }),
+      comanda({ id: 'o2', items: [plato('i2', 'SENT', 'flan')] }),
+    ]);
+
+    expect(cards[0]?.batches.map((b) => b.status)).toEqual(['ACCEPTED', 'SENT']);
+  });
+
+  it('numera los envíos en el orden en que la mesa pidió', () => {
+    const cards = groupByTable([
+      comanda({ id: 'o1', placedAt: '2026-08-15T21:00:00.000Z' }),
+      comanda({ id: 'o2', placedAt: '2026-08-15T21:20:00.000Z' }),
+    ]);
+
+    expect(cards[0]?.batches.map((b) => b.number)).toEqual([1, 2]);
+    expect(cards[0]?.batches.map((b) => b.orderId)).toEqual(['o1', 'o2']);
+  });
+
+  it('le deja a cada envío su propia hora, que no es la de la mesa', () => {
+    const cards = groupByTable([
+      comanda({ id: 'o1', placedAt: '2026-08-15T21:00:00.000Z' }),
+      comanda({ id: 'o2', placedAt: '2026-08-15T21:20:00.000Z' }),
+    ]);
+
+    // La mesa espera desde el primero; el segundo entró recién.
+    expect(cards[0]?.placedAt).toBe('2026-08-15T21:00:00.000Z');
+    expect(cards[0]?.batches[1]?.placedAt).toBe('2026-08-15T21:20:00.000Z');
+  });
+
+  it('un solo envío es un solo bloque', () => {
+    expect(groupByTable([comanda()])[0]?.batches).toHaveLength(1);
+  });
+
   it('pone la tarjeta en la columna del plato más atrasado', () => {
     // Con la limonada lista y el vacío sin empezar, la mesa no está lista.
     const cards = groupByTable([
@@ -111,6 +150,7 @@ describe('qué se muestra abierto cuando la cocina está llena', () => {
     placedAt: `2026-08-15T21:${String(n).padStart(2, '0')}:00.000Z`,
     ticketCount: 1,
     items: [],
+    batches: [],
     // El tiempo de espera viaja aparte, para no atarlo al reloj del test.
     ...({ minutos } as unknown as object),
   });

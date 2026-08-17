@@ -69,6 +69,7 @@ export {
 } from './lib/item-status';
 export {
   type BoardTicket,
+  type CardBatch,
   type TableCard,
   OPEN_CARDS,
   groupByTable,

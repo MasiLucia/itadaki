@@ -258,15 +258,76 @@
 
 .ticket[data-sla='late'] .ticket-time { color: var(--itadaki-accent); }
 
-/* La mesa agregó después del primer envío: el cocinero tiene que notar que
-   esos platos no entraron todos juntos. */
-.ticket-added {
-  margin: 0 0 0.5rem;
+/*
+ * El encabezado de cada envío.
+ *
+ * Sólo aparece cuando la mesa pidió más de una vez, que es cuando hay algo
+ * que distinguir: con un solo envío sería una etiqueta de más arriba de cada
+ * carta. El estado va acá porque es el del envío y no el de la mesa — lo
+ * aceptado tiene que verse aceptado aunque acabe de entrar algo nuevo.
+ */
+.batch-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.4rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed oklch(40% 0.02 40);
+}
+
+.batch-head:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.batch-name {
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--itadaki-status-cooking);
+  color: var(--itadaki-ink-soft);
+}
+
+.batch-stage {
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-surface-sunken);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.batch-time {
+  margin-left: auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--itadaki-ink-soft);
+}
+
+/* Más liviano que el de la mesa: mueve un envío, no la tarjeta entera. */
+.batch-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  border: 1.5px solid var(--itadaki-ink);
+  border-radius: 12px;
+  padding: 0.6rem;
+  background: none;
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--itadaki-ink);
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.batch-btn:active { transform: scale(0.98); }
+
+.batch-btn:focus-visible {
+  outline: 3px solid var(--itadaki-accent-bright);
+  outline-offset: 2px;
 }
 
 .ticket-items {

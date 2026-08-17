@@ -24,6 +24,25 @@ export interface BoardTicket {
 }
 
 /**
+ * Un envío de la mesa, con su propio estado.
+ *
+ * Existe porque juntar los envíos en un solo estado mentía: la mesa que ya
+ * tenía su comanda aceptada volvía a "nuevo" en cuanto alguien agregaba algo,
+ * y el cocinero veía como sin aceptar lo que ya había despachado. El estado
+ * de la mesa sigue siendo el del plato más atrasado —para eso están las
+ * columnas— pero adentro cada envío dice en qué está.
+ */
+export interface CardBatch {
+  /** La comanda del lado del servidor, que es lo que hay que avanzar. */
+  readonly orderId: string;
+  /** Primero, segundo, tercero: el orden en que la mesa fue pidiendo. */
+  readonly number: number;
+  readonly status: OrderStatus;
+  readonly placedAt: string | null;
+  readonly items: TableCard['items'];
+}
+
+/**
  * Todos los platos que una mesa tiene en cocina, vengan del envío que vengan.
  */
 export interface TableCard {
@@ -42,6 +61,8 @@ export interface TableCard {
       readonly orderId: string;
     }
   >;
+  /** Los envíos que la mesa hizo, en orden, cada uno con su estado. */
+  readonly batches: readonly CardBatch[];
 }
 
 /**
@@ -73,6 +94,20 @@ export function groupByTable(tickets: readonly BoardTicket[]): readonly TableCar
       status: item.status as OrderStatus,
     }));
 
+    const batch: CardBatch = {
+      orderId: ticket.id,
+      number: (previo?.batches.length ?? 0) + 1,
+      // El estado del envío sale de sus propios platos y no de los de la
+      // mesa: es la diferencia entre "esto ya está aceptado" y "la mesa tiene
+      // algo sin aceptar".
+      status: orderStatusFrom(
+        ticket.items.map((item) => ({ itemId: item.id, status: item.status as OrderStatus })),
+        ticket.status as OrderStatus,
+      ),
+      placedAt: ticket.placedAt,
+      items,
+    };
+
     cards.set(key, {
       key,
       tableId: ticket.tableId,
@@ -81,6 +116,7 @@ export function groupByTable(tickets: readonly BoardTicket[]): readonly TableCar
       placedAt: earliest(previo?.placedAt ?? null, ticket.placedAt),
       ticketCount: (previo?.ticketCount ?? 0) + 1,
       items: todos,
+      batches: [...(previo?.batches ?? []), batch],
     });
   }
 
