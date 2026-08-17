@@ -1329,6 +1329,24 @@
   border-bottom: none;
 }
 
+/* La columna de la miniatura sólo existe cuando alguna foto vino: en una
+   carta pegada a mano sería una tira de huecos. */
+.preview-list.with-photos .preview-row {
+  grid-template-columns: 34px minmax(80px, 110px) minmax(0, 1fr) auto;
+}
+
+.preview-list:not(.with-photos) .preview-photo {
+  display: none;
+}
+
+.preview-photo {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--itadaki-radius-card);
+  object-fit: cover;
+  background: var(--itadaki-surface-sunken);
+}
+
 .preview-cat {
   font-size: 0.72rem;
   font-weight: 700;

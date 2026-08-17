@@ -1,10 +1,12 @@
 import {
   ALLERGENS,
+  DEFAULT_ADJUSTMENTS,
   DIET_TAGS,
   MAX_CATEGORY,
   MAX_DESCRIPTION,
   MAX_DISHES,
   MAX_NAME,
+  defaultCrop,
   htmlToMenuText,
 } from '@itadaki/catalog/domain';
 import {
@@ -19,14 +21,29 @@ import {
   Post,
 } from '@nestjs/common';
 import { setProductAvailability } from '@itadaki/catalog/application';
+import { uploadImage } from '@itadaki/catalog/application/server';
+import { MAX_UPLOAD_BYTES, validateUpload } from '@itadaki/catalog/infra';
 import { Public, RequirePermission, TenantId } from './auth';
-import { fetchPage } from './fetch-page';
+import { fetchImage, fetchPage } from './fetch-page';
 import { CatalogService } from './catalog.service';
 import { ImagesService } from './images.service';
 import { RealtimeGateway } from './realtime.gateway';
 import { Money } from '@itadaki/shared/domain';
 import { z } from 'zod';
 import { availabilitySchema, toMoneyDto } from './contracts';
+
+/**
+ * Cuántas fotos baja una importación.
+ *
+ * Cada una se baja y se renderiza en varios tamaños, que es lo caro: con la
+ * carta entera de un local grande la petición se haría eterna y el navegador
+ * cortaría antes de guardar nada. Los platos que queden sin foto se suben a
+ * mano desde el editor, que es el camino que ya existe.
+ *
+ * ponytail: tope fijo y descarga en la misma petición. Si una carta grande
+ * empieza a cortar, la salida es hacerlo en segundo plano y avisar al terminar.
+ */
+const MAX_PHOTOS = 40;
 
 /** URL-safe id from a free-text name, accents folded. */
 function slugify(name: string): string {
@@ -462,7 +479,9 @@ export class MenuController {
       throw new HttpException(page.error, HttpStatus.BAD_REQUEST);
     }
 
-    return { text: htmlToMenuText(page.html) };
+    // Con la dirección final, para que las fotos escritas como `/fotos/1.jpg`
+    // apunten a algún lado.
+    return { text: htmlToMenuText(page.html, page.url) };
   }
 
   /**
@@ -489,6 +508,8 @@ export class MenuController {
             description: z.string().max(MAX_DESCRIPTION).default(''),
             priceMinor: z.number().int().min(0),
             category: z.string().min(1).max(MAX_CATEGORY),
+            /** La foto que traía la página de la que salió la carta. */
+            imageUrl: z.string().max(2000).optional(),
           }),
         )
         .min(1)
@@ -524,6 +545,7 @@ export class MenuController {
 
     const imported: string[] = [];
     const failed: Array<{ name: string; reason: string }> = [];
+    let photos = 0;
 
     for (const [index, dish] of parsed.data.dishes.entries()) {
       const categoryId = byName.get(dish.category.toLowerCase());
@@ -554,10 +576,52 @@ export class MenuController {
         station: 'COLD',
       });
 
-      if (saved.isOk()) imported.push(saved.value.name);
-      else failed.push({ name: dish.name, reason: 'NO_SE_PUDO_GUARDAR' });
+      if (saved.isErr()) {
+        failed.push({ name: dish.name, reason: 'NO_SE_PUDO_GUARDAR' });
+        continue;
+      }
+
+      imported.push(saved.value.name);
+      if (dish.imageUrl !== undefined && dish.imageUrl !== '' && photos < MAX_PHOTOS) {
+        // Una foto que no entra no tira el plato: la carta con los precios
+        // bien vale más que la foto, y siempre se puede subir después.
+        if (await this.attachPhoto(tenantId, saved.value.id, dish.imageUrl, dish.name)) {
+          photos += 1;
+        }
+      }
     }
 
-    return { imported: imported.length, failed };
+    return { imported: imported.length, photos, failed };
+  }
+
+  /**
+   * Baja la foto del plato y la guarda con el id del producto.
+   *
+   * Ese id compartido es lo que las une: no hay campo que apuntar, el producto
+   * y su imagen se llaman igual. El encuadre es la foto entera — recortarla
+   * sin verla sería adivinar — y desde el editor se ajusta después.
+   */
+  private async attachPhoto(
+    tenantId: string,
+    productId: string,
+    imageUrl: string,
+    alt: string,
+  ): Promise<boolean> {
+    const downloaded = await fetchImage(imageUrl, MAX_UPLOAD_BYTES);
+    if (!downloaded.ok) return false;
+
+    const accepted = validateUpload(downloaded.bytes);
+    if (accepted.isErr()) return false;
+
+    const run = uploadImage({ images: this.images.store, renderer: this.images.renderer });
+    const stored = await run({
+      tenantId,
+      imageId: productId,
+      original: downloaded.bytes,
+      params: { crop: defaultCrop(), depthOfField: null, adjustments: DEFAULT_ADJUSTMENTS },
+      alt,
+    });
+
+    return stored.isOk();
   }
 }

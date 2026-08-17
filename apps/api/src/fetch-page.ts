@@ -84,9 +84,9 @@ function parseUrl(raw: string): URL | null {
 }
 
 /** Lee el cuerpo hasta el tope, sin confiar en el `content-length` declarado. */
-async function readCapped(response: Response): Promise<string | null> {
+async function readCapped(response: Response, maxBytes: number): Promise<Buffer | null> {
   const reader = response.body?.getReader();
-  if (reader === undefined) return '';
+  if (reader === undefined) return Buffer.alloc(0);
 
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -97,19 +97,30 @@ async function readCapped(response: Response): Promise<string | null> {
     if (value === undefined) continue;
 
     total += value.length;
-    if (total > MAX_BYTES) {
+    if (total > maxBytes) {
       await reader.cancel();
       return null;
     }
     chunks.push(value);
   }
 
-  return new TextDecoder('utf-8').decode(Buffer.concat(chunks));
+  return Buffer.concat(chunks);
 }
 
-export async function fetchPage(
+/**
+ * Baja una dirección ajena revisando cada salto.
+ *
+ * Las redirecciones se siguen a mano porque dejárselas a `fetch` sería revisar
+ * la primera dirección y confiar en el resto: un sitio que contesta 302 hacia
+ * `http://169.254.169.254/` saltearía el control entero.
+ */
+async function fetchGuarded(
   rawUrl: string,
-): Promise<{ ok: true; html: string } | { ok: false; error: FetchPageError }> {
+  accept: string,
+  maxBytes: number,
+): Promise<
+  { ok: true; bytes: Buffer; url: string; contentType: string } | { ok: false; error: FetchPageError }
+> {
   const first = parseUrl(rawUrl);
   if (first === null) return { ok: false, error: { kind: 'URL_INVALIDA' } };
 
@@ -122,11 +133,9 @@ export async function fetchPage(
     let response: Response;
     try {
       response = await fetch(url, {
-        // A mano: seguirlas solo sería revisar la primera dirección y confiar
-        // en el resto, que es exactamente el agujero que esto tapa.
         redirect: 'manual',
         signal: AbortSignal.timeout(TIMEOUT_MS),
-        headers: { accept: 'text/html,text/plain', 'user-agent': 'itadaki-menu-import' },
+        headers: { accept, 'user-agent': 'itadaki-menu-import' },
       });
     } catch {
       return { ok: false, error: { kind: 'NO_RESPONDE' } };
@@ -143,17 +152,48 @@ export async function fetchPage(
 
     if (!response.ok) return { ok: false, error: { kind: 'NO_RESPONDE' } };
 
-    const type = response.headers.get('content-type') ?? '';
-    if (!/text\/html|text\/plain|application\/xhtml/i.test(type)) {
-      // Un PDF o una foto de la carta no son texto: se dice cuál es el
-      // problema en vez de mostrar bytes ilegibles en la vista previa.
-      return { ok: false, error: { kind: 'NO_ES_UNA_PAGINA' } };
-    }
+    const bytes = await readCapped(response, maxBytes).catch(() => null);
+    if (bytes === null) return { ok: false, error: { kind: 'DEMASIADO_GRANDE' } };
 
-    const html = await readCapped(response).catch(() => null);
-    if (html === null) return { ok: false, error: { kind: 'DEMASIADO_GRANDE' } };
-    return { ok: true, html };
+    return {
+      ok: true,
+      bytes,
+      // La dirección final y no la pedida: las fotos vienen relativas y un
+      // redirect a otra carpeta las dejaría apuntando a donde no están.
+      url: url.toString(),
+      contentType: response.headers.get('content-type') ?? '',
+    };
   }
 
   return { ok: false, error: { kind: 'NO_RESPONDE' } };
+}
+
+export async function fetchPage(
+  rawUrl: string,
+): Promise<{ ok: true; html: string; url: string } | { ok: false; error: FetchPageError }> {
+  const got = await fetchGuarded(rawUrl, 'text/html,text/plain', MAX_BYTES);
+  if (!got.ok) return got;
+
+  if (!/text\/html|text\/plain|application\/xhtml/i.test(got.contentType)) {
+    // Un PDF o una foto de la carta no son texto: se dice cuál es el problema
+    // en vez de mostrar bytes ilegibles en la vista previa.
+    return { ok: false, error: { kind: 'NO_ES_UNA_PAGINA' } };
+  }
+
+  return { ok: true, html: new TextDecoder('utf-8').decode(got.bytes), url: got.url };
+}
+
+/**
+ * Baja la foto de un plato de la misma página de la que salió la carta.
+ *
+ * No mira el `content-type`: quién decide si esto es una imagen de verdad es
+ * `validateUpload`, por los primeros bytes y no por lo que el servidor ajeno
+ * diga que mandó.
+ */
+export async function fetchImage(
+  rawUrl: string,
+  maxBytes: number,
+): Promise<{ ok: true; bytes: Buffer } | { ok: false; error: FetchPageError }> {
+  const got = await fetchGuarded(rawUrl, 'image/*', maxBytes);
+  return got.ok ? { ok: true, bytes: got.bytes } : got;
 }

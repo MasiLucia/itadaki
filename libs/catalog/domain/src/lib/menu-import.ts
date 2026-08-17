@@ -19,6 +19,8 @@ export interface ParsedDish {
   /** En unidades menores, como el resto del sistema. */
   readonly priceMinor: number;
   readonly category: string;
+  /** La foto que traía la página, si traía. Vacío cuando no hay. */
+  readonly imageUrl: string;
 }
 
 export interface ParsedLine {
@@ -51,6 +53,16 @@ const PRICE_AT_END = /(?:\$\s*)?(\d{1,3}(?:[.\s]\d{3})+|\d+)(?:,(\d{1,2}))?\s*(?
 
 /** Una línea que separa secciones: sólo símbolos, sin palabras. */
 const DECORATION = /^[\s\-—=*_·•.]+$/;
+
+/**
+ * La foto de un plato, escrita como un renglón más.
+ *
+ * Va en el mismo cuadro de texto y no en una estructura aparte porque ahí es
+ * donde se corrige: si la página engancha la foto al plato equivocado —o si
+ * lo que bajó es el logo del local— se borra ese renglón y listo. Una lista
+ * de fotos escondida detrás de la vista previa no se podría tocar.
+ */
+const IMAGE_LINE = /^\[foto\]\s+(\S+)$/i;
 
 function toMinorUnits(whole: string, cents: string | undefined): number | null {
   // Los separadores de miles se sacan; lo que queda son pesos enteros.
@@ -136,6 +148,17 @@ export function parseMenuText(text: string): ParsedMenu {
 
   let currentCategory = DEFAULT_CATEGORY;
 
+  /**
+   * La foto que todavía no encontró su plato.
+   *
+   * Cada página la pone de un lado: unas antes del nombre y otras después.
+   * Así que se engancha a lo que haya más cerca — al plato anterior si la
+   * foto vino pegada a él, y si no al que venga. Cuál de los dos es se ve en
+   * la vista previa, que es donde se arregla.
+   */
+  let pendingImage: string | null = null;
+  let previousWasDish = false;
+
   for (const [index, rawLine] of text.split(/\r?\n/).entries()) {
     const line = rawLine.trim();
     const lineNumber = index + 1;
@@ -143,6 +166,19 @@ export function parseMenuText(text: string): ParsedMenu {
     // Vacías y separadores decorativos no dicen nada, y marcarlas como
     // problema llenaría la vista previa de ruido.
     if (line === '' || DECORATION.test(line)) continue;
+
+    const imageMatch = IMAGE_LINE.exec(line);
+    if (imageMatch !== null) {
+      const url = imageMatch[1] ?? '';
+      const lastDish = dishes[dishes.length - 1];
+
+      if (previousWasDish && lastDish !== undefined && lastDish.imageUrl === '') {
+        dishes[dishes.length - 1] = { ...lastDish, imageUrl: url };
+      } else {
+        pendingImage = url;
+      }
+      continue;
+    }
 
     const priceMatch = PRICE_AT_END.exec(line);
 
@@ -153,6 +189,9 @@ export function parseMenuText(text: string): ParsedMenu {
       if (name === '') continue;
 
       currentCategory = name;
+      previousWasDish = false;
+      // Una sección corta la cercanía: la foto de arriba era de otra cosa.
+      pendingImage = null;
       if (!categories.includes(name)) categories.push(name);
       continue;
     }
@@ -162,12 +201,14 @@ export function parseMenuText(text: string): ParsedMenu {
     const cleaned = beforePrice.replace(/[.\s·—–-]+$/, '').trim();
 
     if (cleaned === '') {
+      previousWasDish = false;
       skipped.push({ raw: line, lineNumber, problem: 'SIN_NOMBRE', dish: null });
       continue;
     }
 
     const priceMinor = toMinorUnits(priceMatch[1] ?? '', priceMatch[2]);
     if (priceMinor === null) {
+      previousWasDish = false;
       skipped.push({ raw: line, lineNumber, problem: 'PRECIO_INVALIDO', dish: null });
       continue;
     }
@@ -175,12 +216,21 @@ export function parseMenuText(text: string): ParsedMenu {
     const split = splitNameAndDescription(cleaned);
     const { name, description } = fitToLimits(split.name, split.description);
     if (name === '') {
+      previousWasDish = false;
       skipped.push({ raw: line, lineNumber, problem: 'SIN_NOMBRE', dish: null });
       continue;
     }
 
     if (!categories.includes(currentCategory)) categories.push(currentCategory);
-    dishes.push({ name, description, priceMinor, category: currentCategory });
+    dishes.push({
+      name,
+      description,
+      priceMinor,
+      category: currentCategory,
+      imageUrl: pendingImage ?? '',
+    });
+    pendingImage = null;
+    previousWasDish = true;
   }
 
   return { dishes, categories, skipped };
@@ -246,13 +296,48 @@ function decodeEntities(text: string): string {
   });
 }
 
-export function htmlToMenuText(html: string): string {
+/**
+ * De dónde sale la foto de un `<img>`.
+ *
+ * `src` primero, pero media web moderna lo deja en un pixel transparente y
+ * pone la foto real en `data-src` hasta que uno hace scroll. Un `data:` no
+ * sirve para nada acá: es ese pixel, no la foto.
+ */
+function imageSource(tag: string): string | null {
+  for (const attribute of ['data-src', 'data-original', 'data-lazy-src', 'src']) {
+    const found = new RegExp(`\\b${attribute}\\s*=\\s*["']([^"']+)["']`, 'i').exec(tag);
+    const value = found?.[1]?.trim();
+    if (value !== undefined && value !== '' && !value.startsWith('data:')) return value;
+  }
+  return null;
+}
+
+/**
+ * @param baseUrl De dónde se bajó la página, para resolver `src="/fotos/1.jpg"`.
+ *   Sin esto una dirección relativa no lleva a ningún lado y se descarta.
+ */
+export function htmlToMenuText(html: string, baseUrl?: string): string {
   const text = decodeEntities(
     html
       .replace(NOT_TEXT, '\n')
       .replace(/<!--[\s\S]*?-->/g, '')
       // Un `<br>` corta el renglón aunque sea el único tag de toda la carta.
       .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<img\b([^>]*)>/gi, (whole, attributes: string) => {
+        const source = imageSource(attributes);
+        if (source === null) return '\n';
+
+        try {
+          // Absoluta ya sirve; relativa sólo si sabemos de dónde vino.
+          const resolved = baseUrl === undefined ? new URL(source) : new URL(source, baseUrl);
+          return resolved.protocol === 'http:' || resolved.protocol === 'https:'
+            ? `\n[foto] ${resolved.toString()}\n`
+            : '\n';
+        } catch {
+          void whole;
+          return '\n';
+        }
+      })
       .replace(/<([^>]*)>/g, (_, inside: string) => (INLINE_TAGS.test(inside.trim()) ? ' ' : '\n')),
   );
 

@@ -701,6 +701,9 @@ const ROLE_NAMES: Record<string, string> = {
               <p class="preview-count">
                 <strong>{{ parsed().dishes.length }}</strong> platos en
                 <strong>{{ parsed().categories.length }}</strong> secciones
+                @if (withPhoto() > 0) {
+                  · <strong>{{ withPhoto() }}</strong> con foto
+                }
               </p>
 
               @if (parsed().dishes.length > maxDishes) {
@@ -722,9 +725,16 @@ const ROLE_NAMES: Record<string, string> = {
                 </ul>
               }
 
-              <ul class="preview-list">
+              <ul class="preview-list" [class.with-photos]="withPhoto() > 0">
                 @for (dish of parsed().dishes; track dish.name + dish.priceMinor) {
                   <li class="preview-row">
+                    <!-- La foto se ve acá y no después: es la única forma de
+                         notar que la página la enganchó al plato de al lado. -->
+                    @if (dish.imageUrl !== '') {
+                      <img class="preview-photo" [src]="dish.imageUrl" alt="" loading="lazy" />
+                    } @else {
+                      <span class="preview-photo"></span>
+                    }
                     <span class="preview-cat">{{ dish.category }}</span>
                     <span class="preview-name">
                       {{ dish.name }}
@@ -829,6 +839,9 @@ export class AdminComponent {
   protected readonly importResult = signal<string | null>(null);
 
   protected readonly parsed = computed(() => parseMenuText(this.importText()));
+  protected readonly withPhoto = computed(
+    () => this.parsed().dishes.filter((dish) => dish.imageUrl !== '').length,
+  );
 
   protected openImport(): void {
     this.importText.set('');
@@ -945,10 +958,12 @@ export class AdminComponent {
         return;
       }
 
-      const body = (await response.json()) as { imported: number };
+      const body = (await response.json()) as { imported: number; photos: number };
       await this.load();
       this.modal.set(null);
-      this.createdName.set(`${body.imported} platos`);
+      this.createdName.set(
+        body.photos > 0 ? `${body.imported} platos, ${body.photos} con foto` : `${body.imported} platos`,
+      );
       globalThis.setTimeout(() => this.createdName.set(null), 5000);
     } finally {
       this.importing.set(false);

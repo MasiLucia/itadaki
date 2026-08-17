@@ -309,3 +309,59 @@ describe('acomodar la carta a lo que entra', () => {
     expect(dishes[0]?.category).toBe(categories[0]);
   });
 });
+
+describe('traer también la foto de cada plato', () => {
+  const base = 'https://carta.example/menu';
+
+  it('resuelve la dirección relativa contra la página de la que salió', () => {
+    const texto = htmlToMenuText(
+      '<div>Provoleta 5200</div><div class="producto-right"><img src="/images/5475.jpg"></div>',
+      base,
+    );
+
+    expect(texto).toContain('[foto] https://carta.example/images/5475.jpg');
+  });
+
+  it('engancha la foto al plato de arriba cuando viene después', () => {
+    const { dishes } = parseMenuText(
+      ['Provoleta 5200', '[foto] https://carta.example/a.jpg', 'Flan 2600'].join('\n'),
+    );
+
+    expect(dishes[0]?.imageUrl).toBe('https://carta.example/a.jpg');
+    expect(dishes[1]?.imageUrl).toBe('');
+  });
+
+  it('engancha la foto al plato de abajo cuando viene antes', () => {
+    const { dishes } = parseMenuText(
+      ['ENTRADAS', '[foto] https://carta.example/b.jpg', 'Provoleta 5200'].join('\n'),
+    );
+
+    expect(dishes[0]?.imageUrl).toBe('https://carta.example/b.jpg');
+  });
+
+  it('no le pasa la foto de una sección a la siguiente', () => {
+    const { dishes } = parseMenuText(
+      ['Provoleta 5200', '[foto] https://carta.example/c.jpg', 'POSTRES', 'Flan 2600'].join('\n'),
+    );
+
+    expect(dishes[0]?.imageUrl).toBe('https://carta.example/c.jpg');
+    expect(dishes[1]?.imageUrl).toBe('');
+  });
+
+  it('borrar el renglón de la foto deja el plato sin ella', () => {
+    expect(parseMenuText('Provoleta 5200').dishes[0]?.imageUrl).toBe('');
+  });
+
+  it('ignora el pixel transparente y toma la foto que la página carga después', () => {
+    const texto = htmlToMenuText(
+      '<img src="data:image/gif;base64,R0lGOD" data-src="/fotos/9.jpg">',
+      base,
+    );
+
+    expect(texto).toBe('[foto] https://carta.example/fotos/9.jpg');
+  });
+
+  it('descarta la relativa cuando no se sabe de dónde vino la página', () => {
+    expect(htmlToMenuText('<img src="/images/5475.jpg">')).toBe('');
+  });
+});
