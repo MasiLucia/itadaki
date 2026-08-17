@@ -107,11 +107,35 @@
   min-height: 52px;
 }
 
-/* Already asked reads as done, not as broken. */
+/*
+ * Gris es "ahora no se puede", verde es "esto ya lo pediste".
+ *
+ * Antes los dos estados compartían el verde, así que al deshabilitar las
+ * opciones bloqueadas quedaba pintado de "hecho" justamente lo que no se
+ * podía tocar, y lo pedido no se distinguía del resto.
+ */
 .option:disabled {
+  border-color: var(--itadaki-border);
+  background: var(--itadaki-surface-sunken);
+  cursor: default;
+  opacity: 0.55;
+}
+
+.option:disabled .option-label,
+.option:disabled .option-hint {
+  color: var(--itadaki-ink-subtle);
+}
+
+/* Lo pedido, que es lo único verde y sí se puede tocar para cancelar. */
+.option.on {
   border-color: var(--itadaki-status-ready);
   background: var(--itadaki-status-ready-bg);
-  cursor: default;
+  opacity: 1;
+  cursor: pointer;
+}
+
+.option.on .option-label {
+  color: var(--itadaki-ink-strong);
 }
 
 .option-text {
