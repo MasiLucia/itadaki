@@ -69,11 +69,22 @@ export class TrackingStore {
     return Math.max(...pending.map((order) => MINUTES_REMAINING[order.status] ?? 0));
   });
 
+  /** La sesión de la que son los pedidos que están en memoria. */
+  private loadedFor: string | null = null;
+
   constructor() {
     // La sesión aparece al entrar a la mesa y al recuperarla tras un reload.
+    //
+    // Lo cargado se tira al cambiar de sesión: este servicio vive mientras la
+    // pestaña esté abierta, y sin esto la mesa siguiente empezaba viendo los
+    // pedidos de la anterior hasta que llegara la respuesta.
     effect(() => {
-      const sessionId = this.session.session()?.id;
-      if (sessionId !== undefined) void this.load(sessionId);
+      const sessionId = this.session.session()?.id ?? null;
+      if (sessionId === this.loadedFor) return;
+
+      this.loadedFor = sessionId;
+      this.clear();
+      if (sessionId !== null) void this.load(sessionId);
     });
 
     // La cocina avanza el pedido por el mismo socket que la sesión ya tiene

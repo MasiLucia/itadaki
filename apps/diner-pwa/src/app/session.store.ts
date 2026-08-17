@@ -61,6 +61,7 @@ export class SessionStore {
   private readonly table = inject(TableTokenStore);
   private socket: Socket | null = null;
   private readonly orderListeners = new Set<() => void>();
+  private readonly callListeners = new Set<() => void>();
 
   readonly session = signal<SessionDto | null>(null);
   readonly myDinerId = signal<string | null>(null);
@@ -290,10 +291,14 @@ export class SessionStore {
       this.socket?.emit('join-session', { sessionId, tableToken: this.table.token() ?? '' });
       void this.refresh(sessionId);
       this.orderListeners.forEach((notify) => notify());
+      this.callListeners.forEach((notify) => notify());
     });
     this.socket.on('disconnect', () => this.connected.set(false));
     this.socket.on('session.changed', () => void this.refresh(sessionId));
     this.socket.on('order.changed', () => this.orderListeners.forEach((notify) => notify()));
+    // El mozo atendió el llamado desde el salón: el timbre se apaga solo, sin
+    // que nadie de la mesa tenga que abrir la hoja para enterarse.
+    this.socket.on('call.changed', () => this.callListeners.forEach((notify) => notify()));
   }
 
   /**
@@ -303,6 +308,12 @@ export class SessionStore {
   onOrderChanged(listener: () => void): () => void {
     this.orderListeners.add(listener);
     return () => this.orderListeners.delete(listener);
+  }
+
+  /** Lo mismo para el timbre: lo que el salón atiende se ve en la mesa. */
+  onCallChanged(listener: () => void): () => void {
+    this.callListeners.add(listener);
+    return () => this.callListeners.delete(listener);
   }
 
   async refresh(sessionId: string): Promise<void> {

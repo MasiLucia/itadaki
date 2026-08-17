@@ -1,6 +1,7 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { type CallReason, type PaymentMethod } from '@itadaki/ordering/domain';
 import { ApiClient } from './api-client';
+import { SessionStore } from './session.store';
 
 export interface CallDto {
   readonly id: string;
@@ -21,8 +22,40 @@ export interface CallDto {
 @Injectable({ providedIn: 'root' })
 export class CallStore {
   private readonly api = inject(ApiClient);
+  private readonly session = inject(SessionStore);
 
   readonly pending = signal<readonly CallDto[]>([]);
+
+  /** La sesión de la que son los llamados que están en memoria. */
+  private loadedFor: string | null = null;
+
+  constructor() {
+    /**
+     * Los llamados son de una mesa, no del teléfono.
+     *
+     * Este servicio vive mientras la pestaña esté abierta, así que la mesa que
+     * el mozo cobró dejaba su timbre encendido para la mesa siguiente: se
+     * volvía a entrar desde la misma pestaña y aparecía el llamado de la gente
+     * anterior. Desde otra pestaña no pasaba, porque ahí el servicio nacía
+     * vacío — de ahí que pareciera cache.
+     */
+    effect(() => {
+      const sessionId = this.session.session()?.id ?? null;
+      if (sessionId === this.loadedFor) return;
+
+      this.loadedFor = sessionId;
+      this.pending.set([]);
+      this.error.set(null);
+      if (sessionId !== null) void this.load(sessionId);
+    });
+
+    // El salón atiende el llamado y el timbre se apaga solo: sin esto había
+    // que abrir la hoja para que se enterara.
+    this.session.onCallChanged(() => {
+      const sessionId = this.session.session()?.id;
+      if (sessionId !== undefined) void this.load(sessionId);
+    });
+  }
 
   /** Lo que el servidor rechaza, dicho en la mesa y no en código de error. */
   private static readonly MENSAJES: Readonly<Record<string, string>> = {
