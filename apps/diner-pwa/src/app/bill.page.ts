@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { type PaymentMethod } from '@itadaki/ordering/domain';
 import { DINER_PALETTE } from '@itadaki/shared/ui-tokens';
 import { BackLinkComponent } from './back-link.component';
+import { PaymentSheetComponent } from './payment-sheet.component';
 import { CallStore } from './call.store';
 import { BillStore, type MoneyDto, type SplitKind, type TipChoice } from './bill.store';
 import { SessionStore } from './session.store';
@@ -23,29 +24,13 @@ const TIP_OPTIONS: ReadonlyArray<{ label: string; choice: TipChoice }> = [
 
 const CURRENCIES = ['ARS', 'USD', 'EUR', 'BRL'] as const;
 
-/**
- * Cómo paga la mesa, que es lo único que el mozo necesita saber antes de
- * levantarse: si lleva el posnet, si lleva cambio, o si no tiene que ir.
- *
- * "En la caja" no es una forma de pago más: ahí nadie cobra en la mesa y el
- * sistema no se entera de si pagaron, así que la cuenta la cierra el local a
- * mano. Por eso va último y con su explicación.
- */
-const PAYMENT_OPTIONS: ReadonlyArray<{ method: PaymentMethod; label: string; hint: string }> = [
-  { method: 'CARD', label: 'con tarjeta', hint: 'te llevan el posnet a la mesa' },
-  { method: 'CASH', label: 'en efectivo', hint: 'te llevan el cambio' },
-  { method: 'COUNTER', label: 'vamos a la caja', hint: 'pagan al salir, en el mostrador' },
-];
 
 @Component({
   selector: 'itd-bill',
   standalone: true,
-  imports: [RouterLink, BackLinkComponent],
+  imports: [RouterLink, BackLinkComponent, PaymentSheetComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './bill.page.css',
-  // Escape cierra la pregunta: en un teclado es lo que la mano ya hace, y en
-  // el teléfono no molesta a nadie.
-  host: { '(document:keydown.escape)': 'confirming.set(false)' },
   template: `
     <header class="pad">
       <itd-back to="/carta" label="la carta" />
@@ -204,39 +189,17 @@ const PAYMENT_OPTIONS: ReadonlyArray<{ method: PaymentMethod; label: string; hin
       <!-- Elegir cómo pagan es una pregunta, no un tercer piso del pie: al
            abrirse ahí abajo empujaba el total fuera de la pantalla y las tres
            formas de pago competían con los botones de propina que quedaban al
-           lado. Acá la pregunta ocupa la pantalla y se contesta de una. -->
+           lado. La hoja es la misma que abre el timbre, para que la mesa no
+           tenga que contestar dos preguntas distintas según por dónde entró. -->
       @if (confirming()) {
-        <div class="pay-backdrop" (click)="confirming.set(false)"></div>
-        <div
-          class="pay-sheet"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="pay-title"
-        >
-          <p class="pay-title" id="pay-title">¿cómo van a pagar?</p>
-          <p class="pay-note">le avisamos al mozo para que venga con lo que haga falta</p>
-
-          @for (option of paymentOptions; track option.method) {
-            <button
-              type="button"
-              class="pay-option"
-              [disabled]="calls.busy()"
-              (click)="tell(option.method)"
-            >
-              <span class="pay-label">{{ option.label }}</span>
-              <span class="pay-hint">{{ option.hint }}</span>
-            </button>
-          }
-
-          @if (calls.error(); as message) {
-            <p class="pay-note" role="alert">{{ message }}</p>
-          }
-
-          <button type="button" class="pay-cancel" (click)="confirming.set(false)">
-            cancelar
-          </button>
-        </div>
+        <itd-payment-sheet
+          [busy]="calls.busy()"
+          [error]="calls.error()"
+          (choose)="tell($event)"
+          (close)="confirming.set(false)"
+        />
       }
+
     } @else {
       <main class="body empty">
         @if (store.busy()) {
@@ -261,7 +224,6 @@ export class BillPage {
   protected readonly splitOptions = SPLIT_LABELS;
   protected readonly tipOptions = TIP_OPTIONS;
   protected readonly currencies = CURRENCIES;
-  protected readonly paymentOptions = PAYMENT_OPTIONS;
 
   protected readonly splitKind = signal<SplitKind>('BY_DINER');
   protected readonly parts = signal(2);

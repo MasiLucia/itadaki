@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { type CallReason, type PaymentMethod } from '@itadaki/ordering/domain';
 import { CallStore } from './call.store';
+import { PaymentSheetComponent } from './payment-sheet.component';
 import { SessionStore } from './session.store';
 
 const OPTIONS: ReadonlyArray<{ reason: CallReason; label: string; hint: string }> = [
@@ -9,17 +10,6 @@ const OPTIONS: ReadonlyArray<{ reason: CallReason; label: string; hint: string }
   { reason: 'QUESTION', label: 'Tengo una duda', hint: 'Sobre un plato o la carta' },
 ];
 
-/**
- * Asked only for the bill.
- *
- * Saves the waiter a trip: they know whether to carry the card reader before
- * walking over. "Todavía no sé" is a real answer, not a missing one.
- */
-const PAYMENT_OPTIONS: ReadonlyArray<{ method: PaymentMethod; label: string; hint: string }> = [
-  { method: 'CARD', label: 'Con tarjeta', hint: 'Te llevan el posnet' },
-  { method: 'CASH', label: 'En efectivo', hint: 'Te llevan el cambio' },
-  { method: 'UNDECIDED', label: 'Todavía no sé', hint: 'Lo definimos en la mesa' },
-];
 
 /** A qué borde se pega, y a qué altura sobre el piso de la pantalla. */
 interface Placement {
@@ -90,36 +80,14 @@ function savePlacement(placement: Placement): void {
 @Component({
   selector: 'itd-call-button',
   standalone: true,
+  imports: [PaymentSheetComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './call-button.component.css',
   template: `
     @if (session.isJoined()) {
-      @if (open()) {
+      @if (open() && !askingPayment()) {
         <div class="sheet-backdrop" (click)="open.set(false)"></div>
         <div class="sheet" role="dialog" aria-label="Llamar a alguien">
-          @if (askingPayment()) {
-            <p class="sheet-title">¿Cómo van a pagar?</p>
-
-            @for (payment of paymentOptions; track payment.method) {
-              <button
-                type="button"
-                class="option"
-                [disabled]="calls.busy()"
-                (click)="askBill(payment.method)"
-              >
-                <span class="option-text">
-                  <span class="option-label">{{ payment.label }}</span>
-                  <span class="option-hint">{{ payment.hint }}</span>
-                </span>
-              </button>
-            }
-
-            @if (calls.error(); as message) {
-              <p class="sheet-error" role="alert">{{ message }}</p>
-            }
-
-            <button type="button" class="cancel" (click)="askingPayment.set(false)">Volver</button>
-          } @else {
           <p class="sheet-title">¿Qué necesitás?</p>
 
           @for (option of options; track option.reason) {
@@ -150,8 +118,19 @@ function savePlacement(placement: Placement): void {
           }
 
           <button type="button" class="cancel" (click)="open.set(false)">Cerrar</button>
-          }
         </div>
+      }
+
+      <!-- La misma hoja que abre la cuenta: la mesa contesta lo mismo se haya
+           metido por el timbre o por el pie de la cuenta. -->
+      @if (askingPayment()) {
+        <itd-payment-sheet
+          [busy]="calls.busy()"
+          [error]="calls.error()"
+          cancelLabel="volver"
+          (choose)="askBill($event)"
+          (close)="askingPayment.set(false)"
+        />
       }
 
       <button
@@ -184,7 +163,6 @@ export class CallButtonComponent {
   protected readonly session = inject(SessionStore);
 
   protected readonly options = OPTIONS;
-  protected readonly paymentOptions = PAYMENT_OPTIONS;
   protected readonly open = signal(false);
   protected readonly askingPayment = signal(false);
 
