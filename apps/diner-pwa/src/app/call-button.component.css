@@ -110,15 +110,17 @@
 /*
  * Gris es "ahora no se puede", verde es "esto ya lo pediste".
  *
- * Antes los dos estados compartían el verde, así que al deshabilitar las
- * opciones bloqueadas quedaba pintado de "hecho" justamente lo que no se
- * podía tocar, y lo pedido no se distinguía del resto.
+ * Antes los dos estados compartían el verde, así que quedaba pintado de
+ * "hecho" justamente lo que no se podía tocar. El gris se aparta del beige de
+ * las opciones libres — un fondo apenas más oscuro se leía como una opción
+ * más, no como una apagada — y se desatura para que no compita con ellas.
  */
 .option:disabled {
-  border-color: var(--itadaki-border);
-  background: var(--itadaki-surface-sunken);
-  cursor: default;
-  opacity: 0.55;
+  border-color: transparent;
+  background: color-mix(in oklab, var(--itadaki-ink-subtle) 12%, transparent);
+  cursor: not-allowed;
+  filter: grayscale(1);
+  opacity: 0.5;
 }
 
 .option:disabled .option-label,
@@ -126,16 +128,31 @@
   color: var(--itadaki-ink-subtle);
 }
 
-/* Lo pedido, que es lo único verde y sí se puede tocar para cancelar. */
+.option:disabled .option-label {
+  font-weight: 600;
+}
+
+/*
+ * Lo pedido: lo único verde, y lo único con tilde.
+ *
+ * Va después del bloqueado a propósito. Un llamado pendiente nunca está
+ * deshabilitado — tocarlo es como se cancela — pero si alguna vez lo
+ * estuviera, el verde tiene que ganarle al gris: dice algo que el gris no.
+ */
 .option.on {
   border-color: var(--itadaki-status-ready);
   background: var(--itadaki-status-ready-bg);
-  opacity: 1;
   cursor: pointer;
+  filter: none;
+  opacity: 1;
 }
 
 .option.on .option-label {
   color: var(--itadaki-ink-strong);
+}
+
+.option.on .option-hint {
+  color: var(--itadaki-status-ready-fg);
 }
 
 .option-text {

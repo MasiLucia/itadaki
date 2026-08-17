@@ -4,7 +4,7 @@
  */
 // Bumping the shell name evicts the previous cache on activate, which is what
 // retires a bad shell from devices that already stored one.
-const SHELL = 'itadaki-shell-v2';
+const SHELL = 'itadaki-shell-v3';
 const IMAGES = 'itadaki-images-v1';
 
 self.addEventListener('install', (event) => {
