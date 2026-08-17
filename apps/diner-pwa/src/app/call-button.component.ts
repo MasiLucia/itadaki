@@ -284,7 +284,21 @@ export class CallButtonComponent {
    * antes de pedir es exactamente lo que hace alguien que recién se sienta.
    */
   protected blocked(reason: CallReason): boolean {
-    return reason === 'BILL' && !this.tableHasOrdered();
+    if (reason === 'BILL' && !this.tableHasOrdered()) return true;
+    return this.blockedByOther(reason);
+  }
+
+  /**
+   * Un llamado a la vez.
+   *
+   * Al mozo le llegaban tres avisos de la misma mesa y no sabía cuál atender
+   * primero: cada uno pide algo distinto — acercarse, traer la cuenta,
+   * responder una duda — y los tres juntos no dicen qué necesita la mesa
+   * ahora. El que está pedido sigue habilitado para poder destildarlo.
+   */
+  private blockedByOther(reason: CallReason): boolean {
+    const waiting = this.calls.waitingFor();
+    return waiting.size > 0 && !waiting.has(reason);
   }
 
   private tableHasOrdered(): boolean {
@@ -295,9 +309,17 @@ export class CallButtonComponent {
     return cart || placed;
   }
 
+  /**
+   * Por qué está gris.
+   *
+   * Un botón deshabilitado sin motivo se lee como una app rota; con el motivo
+   * al lado se lee como una regla, y además dice cómo salir de ella.
+   */
   protected hintFor(option: { reason: CallReason; hint: string }): string {
-    if (this.blocked(option.reason)) return 'Todavía no pidieron nada';
-    return this.waiting(option.reason) ? 'Ya avisamos · tocá para cancelar' : option.hint;
+    if (this.waiting(option.reason)) return 'Ya avisamos · tocá para cancelar';
+    if (option.reason === 'BILL' && !this.tableHasOrdered()) return 'Todavía no pidieron nada';
+    if (this.blockedByOther(option.reason)) return 'Cancelá el otro llamado primero';
+    return option.hint;
   }
 
   /**
@@ -318,6 +340,11 @@ export class CallButtonComponent {
   }
 
   protected async raise(reason: CallReason): Promise<void> {
+    // La hoja ya deshabilita el botón, pero la regla se comprueba también acá:
+    // el paso del medio para elegir cómo pagan deja abierta una hoja que
+    // sobrevive a que otro teléfono de la mesa llame mientras tanto.
+    if (this.blocked(reason)) return;
+
     // Asking for the bill is two taps: the second one saves the waiter a trip.
     if (reason === 'BILL') {
       this.askingPayment.set(true);
