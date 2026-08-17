@@ -1,4 +1,4 @@
-import { ALLERGENS, DIET_TAGS } from '@itadaki/catalog/domain';
+import { ALLERGENS, DIET_TAGS, htmlToMenuText } from '@itadaki/catalog/domain';
 import {
   Body,
   Controller,
@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { setProductAvailability } from '@itadaki/catalog/application';
 import { Public, RequirePermission, TenantId } from './auth';
+import { fetchPage } from './fetch-page';
 import { CatalogService } from './catalog.service';
 import { ImagesService } from './images.service';
 import { RealtimeGateway } from './realtime.gateway';
@@ -425,6 +426,35 @@ export class MenuController {
     }
 
     return { removed: groupId };
+  }
+
+  /**
+   * Trae la carta que el restaurante ya tiene publicada en su página.
+   *
+   * Devuelve texto y no platos: cae en el mismo cuadro que el pegado y la
+   * planilla, pasa por la misma vista previa y se corrige a mano antes de
+   * guardar. Una página no es una fuente confiable —tiene el menú de
+   * navegación, el teléfono, el horario— así que interpretarla sin que nadie
+   * la mire sería publicar "Contacto" como sección.
+   *
+   * Baja del lado del servidor porque el navegador no puede: el sitio ajeno no
+   * manda CORS para nosotros. Eso pone al servidor a pedir una URL que escribe
+   * otro, y de ahí la guarda contra la red interna en `fetchPage`.
+   */
+  @RequirePermission('menu:write')
+  @Post('import/fetch')
+  async importFromUrl(@Body() body: unknown) {
+    const parsed = z.object({ url: z.string().min(1).max(2000) }).safeParse(body);
+    if (!parsed.success) {
+      throw new HttpException(parsed.error.issues, HttpStatus.BAD_REQUEST);
+    }
+
+    const page = await fetchPage(parsed.data.url);
+    if (!page.ok) {
+      throw new HttpException(page.error, HttpStatus.BAD_REQUEST);
+    }
+
+    return { text: htmlToMenuText(page.html) };
   }
 
   /**

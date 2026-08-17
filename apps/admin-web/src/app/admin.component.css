@@ -1208,6 +1208,31 @@
   color: var(--itadaki-ink-soft);
 }
 
+/* La URL y su botón en un renglón: son un solo gesto. En pantalla angosta se
+   apilan, porque una dirección web no entra al lado de nada. */
+.import-url {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.import-url-input {
+  flex: 1 1 16rem;
+  min-width: 0;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-card);
+  background: var(--itadaki-surface-sunken);
+  font-family: inherit;
+  font-size: 0.86rem;
+  transition: border-color 0.16s ease;
+}
+
+.import-url-input:focus {
+  outline: none;
+  border-color: var(--itadaki-accent);
+}
+
 /* Subir un archivo es la alternativa a pegar, no el camino principal: el que
    tiene la carta en un mensaje no tiene ningún archivo que subir. */
 .import-file {

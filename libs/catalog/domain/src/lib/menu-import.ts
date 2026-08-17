@@ -152,6 +152,70 @@ export function parseMenuText(text: string): ParsedMenu {
  * cualquiera sin pensarlo.
  */
 
+/**
+ * Una carta que ya está publicada en una página.
+ *
+ * El que tiene su carta en su propio sitio no la tiene en ningún archivo:
+ * copiarla del navegador trae los precios pegados a los nombres o cada palabra
+ * en su renglón, según cómo esté armada la página. Esto la deja en las mismas
+ * líneas que ya entiende `parseMenuText`, y cae en el mismo cuadro para
+ * corregirla a mano antes de guardar.
+ *
+ * Sin parser de HTML a propósito: no hay ninguno en el proyecto y traer uno
+ * para buscar dónde termina un renglón es más de lo que hace falta. Lo que sí
+ * importa es la diferencia entre tags: un `<div>` corta la línea y un `<span>`
+ * no, porque media carta escribe `<span>Milanesa</span><span>$8.500</span>` y
+ * cortar ahí separaría cada plato de su precio.
+ */
+
+/** Tags que envuelven texto adentro de un renglón, sin cortarlo. */
+const INLINE_TAGS =
+  /^\/?(?:span|a|b|strong|em|i|u|small|big|font|mark|sub|sup|abbr|time|label|code|s|q|var|bdi|wbr)\b/i;
+
+/** Lo que no es texto de la página y ensucia todo si se deja. */
+const NOT_TEXT = /<(script|style|noscript|svg|head|template)\b[^>]*>[\s\S]*?<\/\1>/gi;
+
+/** Las entidades que aparecen de verdad en una carta escrita en español. */
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
+  hellip: '…', bull: '•', middot: '·', laquo: '«', raquo: '»', deg: '°', euro: '€',
+  aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', ntilde: 'ñ', uuml: 'ü',
+  Aacute: 'Á', Eacute: 'É', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú', Ntilde: 'Ñ', Uuml: 'Ü',
+};
+
+function decodeEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, body: string) => {
+    if (body.startsWith('#')) {
+      const code = body[1] === 'x' || body[1] === 'X'
+        ? Number.parseInt(body.slice(2), 16)
+        : Number.parseInt(body.slice(1), 10);
+      // Fuera del rango Unicode `fromCodePoint` tira: se deja como estaba.
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff
+        ? String.fromCodePoint(code)
+        : whole;
+    }
+    return NAMED_ENTITIES[body] ?? whole;
+  });
+}
+
+export function htmlToMenuText(html: string): string {
+  const text = decodeEntities(
+    html
+      .replace(NOT_TEXT, '\n')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      // Un `<br>` corta el renglón aunque sea el único tag de toda la carta.
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<([^>]*)>/g, (_, inside: string) => (INLINE_TAGS.test(inside.trim()) ? ' ' : '\n')),
+  );
+
+  return text
+    .split('\n')
+    // El espacio duro que mete cualquier editor visual cuenta como espacio.
+    .map((line) => line.replace(/[^\S\n]+/g, ' ').trim())
+    .filter((line) => line !== '')
+    .join('\n');
+}
+
 /** Cómo suele llamarse cada columna en una planilla de carta. */
 const COLUMN_NAMES = {
   name: ['nombre', 'plato', 'producto', 'item', 'descripcion corta', 'name', 'product'],

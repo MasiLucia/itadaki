@@ -65,6 +65,20 @@ interface StaffMember {
   active: boolean;
 }
 
+/**
+ * Por qué no se pudo traer la carta de una URL.
+ *
+ * Cada uno dice qué hacer: la salida siempre es copiar y pegar, que es el
+ * camino que ya funciona.
+ */
+const FETCH_ERRORS: Record<string, string> = {
+  URL_INVALIDA: 'Esa dirección no es válida. Tiene que empezar con http:// o https://',
+  DESTINO_NO_PERMITIDO: 'Esa dirección no es una página de internet.',
+  NO_RESPONDE: 'La página no respondió. Probá copiando el texto y pegándolo acá.',
+  NO_ES_UNA_PAGINA: 'Eso no es una página de texto — un PDF o una foto no los podemos leer. Copiá el texto y pegalo acá.',
+  DEMASIADO_GRANDE: 'Esa página pesa demasiado. Copiá la parte de la carta y pegala acá.',
+};
+
 const ROLE_NAMES: Record<string, string> = {
   OWNER: 'Dueño',
   MANAGER: 'Encargado',
@@ -638,6 +652,28 @@ const ROLE_NAMES: Record<string, string> = {
             con el precio al final, y las secciones solas en su renglón.
           </p>
 
+          <!-- La página ajena tampoco es un camino aparte: baja, se convierte
+               a las mismas líneas y cae en el mismo cuadro. Lo que trae una
+               web tiene ruido —el menú de navegación, el horario— y por eso
+               importa que se pueda borrar a mano antes de guardar. -->
+          <div class="import-url">
+            <input
+              type="url"
+              class="import-url-input"
+              placeholder="https://mirestaurante.com/carta"
+              [value]="importUrl()"
+              (input)="onImportUrl($event)"
+            />
+            <button
+              type="button"
+              class="secondary"
+              [disabled]="importUrl().trim() === '' || fetching()"
+              (click)="fetchFromUrl()"
+            >
+              {{ fetching() ? 'Trayendo…' : 'Traer de la web' }}
+            </button>
+          </div>
+
           <!-- El archivo cae en el mismo cuadro: se puede corregir a mano
                antes de guardar, sin volver a Excel. -->
           <label class="import-file">
@@ -775,6 +811,8 @@ export class AdminComponent {
 
   /** El texto pegado y lo que se entendió de él. */
   protected readonly importText = signal('');
+  protected readonly importUrl = signal('');
+  protected readonly fetching = signal(false);
   protected readonly importing = signal(false);
   protected readonly importResult = signal<string | null>(null);
 
@@ -782,12 +820,62 @@ export class AdminComponent {
 
   protected openImport(): void {
     this.importText.set('');
+    this.importUrl.set('');
     this.importResult.set(null);
     this.modal.set('importar');
   }
 
   protected onImportText(event: Event): void {
     this.importText.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  protected onImportUrl(event: Event): void {
+    this.importUrl.set((event.target as HTMLInputElement).value);
+  }
+
+  /**
+   * Trae la carta publicada en la web del restaurante.
+   *
+   * La baja el servidor, que además es el único que puede: el sitio ajeno no
+   * autoriza al navegador a leerlo. Vuelve como texto y termina en el mismo
+   * cuadro, así que lo que traiga de más se borra antes de guardar.
+   */
+  protected async fetchFromUrl(): Promise<void> {
+    const url = this.importUrl().trim();
+    if (url === '') return;
+
+    this.fetching.set(true);
+    this.importResult.set(null);
+
+    try {
+      const response = await this.auth.apiFetch(`${API}/menu/import/fetch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...this.auth.headers() },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        const detail = (await response.json().catch(() => null)) as { kind?: string } | null;
+        this.importResult.set(FETCH_ERRORS[detail?.kind ?? ''] ?? 'No pudimos leer esa página.');
+        return;
+      }
+
+      const body = (await response.json()) as { text: string };
+      if (body.text.trim() === '') {
+        // Pasa con las páginas que arman la carta con JavaScript: el HTML
+        // llega vacío y no hay nada que interpretar.
+        this.importResult.set(
+          'Esa página no trae la carta como texto. Copiala del navegador y pegala acá.',
+        );
+        return;
+      }
+
+      this.importText.set(body.text);
+    } catch {
+      this.importResult.set('No pudimos leer esa página.');
+    } finally {
+      this.fetching.set(false);
+    }
   }
 
   /**

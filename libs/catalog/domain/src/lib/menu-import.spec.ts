@@ -1,4 +1,4 @@
-import { DEFAULT_CATEGORY, csvToMenuText, parseMenuText } from './menu-import';
+import { DEFAULT_CATEGORY, csvToMenuText, htmlToMenuText, parseMenuText } from './menu-import';
 
 describe('leer una carta pegada de otro lado', () => {
   it('lee un plato con su precio', () => {
@@ -214,5 +214,46 @@ describe('subir la carta como planilla', () => {
   it('deja sin sección lo que la planilla no clasifica', () => {
     const csv = ['nombre,precio', 'Flan,2600'].join('\n');
     expect(importar(csv).dishes[0]?.category).toBe(DEFAULT_CATEGORY);
+  });
+});
+
+describe('leer una carta publicada en una página', () => {
+  const importar = (html: string) => parseMenuText(htmlToMenuText(html));
+
+  it('deja el plato y su precio en el mismo renglón aunque estén en spans distintos', () => {
+    const { dishes } = importar(
+      '<li><span class="n">Milanesa napolitana</span><span class="p">$8.500</span></li>',
+    );
+
+    expect(dishes).toHaveLength(1);
+    expect(dishes[0]?.name).toBe('Milanesa napolitana');
+    expect(dishes[0]?.priceMinor).toBe(850_000);
+  });
+
+  it('corta el renglón donde la página lo corta', () => {
+    const { dishes, categories } = importar(
+      '<h2>ENTRADAS</h2><div>Empanadas 3400</div><div>Provoleta<br>5200</div>',
+    );
+
+    expect(categories).toEqual(['ENTRADAS', 'Provoleta']);
+    expect(dishes.map((d) => d.name)).toEqual(['Empanadas']);
+  });
+
+  it('tira el script y el estilo, que no son la carta', () => {
+    const texto = htmlToMenuText(
+      '<style>.p{color:red}</style><script>var precio = 9999;</script><p>Flan 2600</p>',
+    );
+
+    expect(texto).toBe('Flan 2600');
+  });
+
+  it('devuelve los acentos y el símbolo escritos como entidades', () => {
+    const texto = htmlToMenuText('<p>Milanesa a caballo&nbsp;&mdash;&nbsp;$8.500</p><p>Pur&eacute;</p>');
+
+    expect(texto).toBe('Milanesa a caballo — $8.500\nPuré');
+  });
+
+  it('no devuelve nada de una página que arma la carta con JavaScript', () => {
+    expect(htmlToMenuText('<div id="menu"></div><script>render()</script>')).toBe('');
   });
 });
