@@ -1,7 +1,9 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, signal } from '@angular/core';
 import { type Cart } from '@itadaki/ordering/domain';
 import { ApiClient } from './api-client';
 import { OfflineStore } from './offline.store';
+import { SessionStore } from './session.store';
+import { submissionIsStale } from './submission-stale';
 
 export type SubmitState =
   | { readonly kind: 'idle' }
@@ -15,9 +17,33 @@ export type SubmitState =
 export class OrderService {
   private readonly api = inject(ApiClient);
   private readonly offline = inject(OfflineStore);
+  private readonly session = inject(SessionStore);
   private readonly state = signal<SubmitState>({ kind: 'idle' });
 
   readonly submitState = this.state.asReadonly();
+
+  /** Si el carrito de la mesa quedó vacío después del último envío. */
+  private emptiedSinceSend = false;
+
+  constructor() {
+    // Vive acá y no en la pantalla del carrito porque el caso es justamente
+    // haberse ido a la carta: al volver, la pantalla es nueva y no se acuerda
+    // de nada.
+    effect(() => {
+      const kind = this.state().kind;
+      const pending = this.session.session()?.lines.length ?? 0;
+
+      if (kind !== 'sent' && kind !== 'queued') {
+        this.emptiedSinceSend = false;
+        return;
+      }
+      if (pending === 0) {
+        this.emptiedSinceSend = true;
+        return;
+      }
+      if (submissionIsStale(kind, pending, this.emptiedSinceSend)) this.reset();
+    });
+  }
 
   /**
    * The client request id is generated once per attempt and reused on retry,
