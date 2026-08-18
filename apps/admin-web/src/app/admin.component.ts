@@ -23,12 +23,16 @@ import { MetricsComponent } from './metrics.component';
  * el editor de fotos, el equipo, las mesas. Había que scrollear todo para
  * llegar a cualquier cosa, y nada indicaba dónde ir para cada tarea.
  */
-type AdminTab = 'carta' | 'fotos' | 'local';
+type AdminTab = 'carta' | 'fotos' | 'local' | 'ventas' | 'resenas';
 
 const TABS: ReadonlyArray<{ id: AdminTab; label: string; hint: string }> = [
   { id: 'carta', label: 'Tu carta', hint: 'platos y categorías' },
   { id: 'fotos', label: 'Fotos', hint: 'encuadrar y publicar' },
-  { id: 'local', label: 'Tu local', hint: 'mesas, equipo y ventas' },
+  { id: 'local', label: 'Tu local', hint: 'mesas y equipo' },
+  // Las ventas salen de "Tu local": mirar los números es otra tarea, en otro
+  // momento del día, y estaban al pie de una pantalla de configuración.
+  { id: 'ventas', label: 'Ventas', hint: 'qué se vendió y cuándo' },
+  { id: 'resenas', label: 'Reseñas', hint: 'opiniones en Google' },
 ];
 
 const API = apiUrl();
@@ -479,12 +483,48 @@ const ROLE_NAMES: Record<string, string> = {
 
       </section>
 
-      @if (auth.can('metrics:read')) {
+      }
+
+      @if (activeTab() === 'ventas') {
         <section class="panel">
           <h2 class="panel-title">Ventas</h2>
           <itd-metrics [apiUrl]="apiUrl" />
         </section>
       }
+
+      @if (activeTab() === 'resenas') {
+        <section class="panel">
+          <h2 class="panel-title">Reseñas de Google</h2>
+
+          <!-- Todavía no está construido. Se anuncia acá, y no como algo que
+               ya anda, porque un botón que promete y no hace es peor que no
+               tenerlo: el que lo toca deja de creer el resto del panel. -->
+          <div class="soon">
+            <p class="soon-badge">Lo estamos terminando</p>
+            <p class="soon-lede">
+              Cuando la mesa termina de pagar, el mismo teléfono con el que pidió
+              le va a ofrecer dejar la reseña en Google.
+            </p>
+            <p class="soon-why">
+              Es el único momento del día en que el cliente está conforme, con el
+              teléfono en la mano y la comida fresca en la memoria. Un cartelito
+              en la mesa no compite con eso.
+            </p>
+
+            <ol class="soon-steps">
+              <li>Conectás tu ficha de Google una sola vez.</li>
+              <li>La mesa paga y le aparece el pedido de reseña.</li>
+              <li>Ves acá cuántas entraron y con cuántas estrellas.</li>
+            </ol>
+
+            <button type="button" class="secondary" disabled>
+              Conectar con Google — en camino
+            </button>
+            <p class="soon-note">
+              Te avisamos apenas esté. No tiene costo extra.
+            </p>
+          </div>
+        </section>
       }
     </div>
 
@@ -786,10 +826,18 @@ export class AdminComponent {
     return TABS.find((tab) => tab.id === this.activeTab())?.label ?? 'Administración';
   }
 
-  /** El equipo y las ventas sólo los ve quien tiene permiso. */
+  /**
+   * Cada solapa pide lo suyo.
+   *
+   * Antes "Tu local" mezclaba equipo y ventas, así que alcanzaba con
+   * cualquiera de los dos permisos para ver las dos cosas. Separadas, cada una
+   * exige lo que le corresponde: un encargado sin `staff:manage` mira los
+   * números sin poder tocar el personal.
+   */
   protected canSee(tab: AdminTab): boolean {
-    if (tab !== 'local') return true;
-    return this.auth.can('staff:manage') || this.auth.can('metrics:read');
+    if (tab === 'local') return this.auth.can('staff:manage');
+    if (tab === 'ventas' || tab === 'resenas') return this.auth.can('metrics:read');
+    return true;
   }
 
   protected readonly products = signal<readonly MenuProduct[]>([]);

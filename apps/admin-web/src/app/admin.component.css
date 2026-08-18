@@ -1396,3 +1396,66 @@
   color: var(--itadaki-ink-soft);
   margin-right: 0.4rem;
 }
+
+/*
+ * Lo que todavía no está.
+ *
+ * Se muestra apagado y rotulado a propósito: anunciar algo que viene sirve,
+ * pero disfrazarlo de función lista hace que el primero que lo toque deje de
+ * creer el resto del panel.
+ */
+.soon {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  align-items: flex-start;
+  max-width: 46rem;
+  padding: 1.4rem;
+  border: 1.5px dashed var(--itadaki-border);
+  border-radius: var(--itadaki-radius-card, 16px);
+  background: var(--itadaki-surface-sunken);
+}
+
+.soon-badge {
+  margin: 0;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: var(--itadaki-accent-soft, var(--itadaki-surface));
+  color: var(--itadaki-ink-strong);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.soon-lede {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--itadaki-ink-strong);
+}
+
+.soon-why {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--itadaki-ink-subtle);
+}
+
+.soon-steps {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--itadaki-ink-soft, var(--itadaki-ink-subtle));
+}
+
+.soon-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--itadaki-ink-subtle);
+}
