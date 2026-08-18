@@ -31,7 +31,7 @@ const TABS: ReadonlyArray<{ id: AdminTab; label: string; hint: string }> = [
   { id: 'local', label: 'Tu local', hint: 'mesas y equipo' },
   // Las ventas salen de "Tu local": mirar los números es otra tarea, en otro
   // momento del día, y estaban al pie de una pantalla de configuración.
-  { id: 'ventas', label: 'Ventas', hint: 'qué se vendió y cuándo' },
+  { id: 'ventas', label: 'Métricas', hint: 'ventas, tiempos y horarios' },
   { id: 'resenas', label: 'Reseñas', hint: 'opiniones en Google' },
 ];
 
@@ -487,7 +487,7 @@ const ROLE_NAMES: Record<string, string> = {
 
       @if (activeTab() === 'ventas') {
         <section class="panel">
-          <h2 class="panel-title">Ventas</h2>
+          <h2 class="panel-title">Métricas</h2>
           <itd-metrics [apiUrl]="apiUrl" />
         </section>
       }
@@ -511,18 +511,19 @@ const ROLE_NAMES: Record<string, string> = {
               en la mesa no compite con eso.
             </p>
 
-            <ol class="soon-steps">
-              <li>Conectás tu ficha de Google una sola vez.</li>
-              <li>La mesa paga y le aparece el pedido de reseña.</li>
-              <li>Ves acá cuántas entraron y con cuántas estrellas.</li>
-            </ol>
+            <div class="soon-side">
+              <p class="soon-steps-title">Cómo va a funcionar</p>
+              <ol class="soon-steps">
+                <li>Conectás tu ficha de Google una sola vez.</li>
+                <li>La mesa paga y le aparece el pedido de reseña.</li>
+                <li>Ves acá cuántas entraron y con cuántas estrellas.</li>
+              </ol>
 
-            <button type="button" class="secondary" disabled>
-              Conectar con Google — en camino
-            </button>
-            <p class="soon-note">
-              Te avisamos apenas esté. No tiene costo extra.
-            </p>
+              <button type="button" class="secondary" disabled>
+                Conectar con Google — en camino
+              </button>
+              <p class="soon-note">Te avisamos apenas esté. No tiene costo extra.</p>
+            </div>
           </div>
         </section>
       }

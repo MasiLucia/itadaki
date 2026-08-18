@@ -100,6 +100,16 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+/*
+ * Mirar números y leer una explicación no es lo mismo que cargar un plato.
+ * Con el ancho de un formulario quedaban apilados en una columna angosta en
+ * el medio de una pantalla ancha, con los dos costados vacíos.
+ */
+.layout[data-tab='ventas'],
+.layout[data-tab='resenas'] {
+  max-width: 1180px;
+}
+
 @media (min-width: 900px) {
   .layout[data-tab='fotos'] {
     grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
@@ -802,8 +812,10 @@
  * un embudo. El subtítulo dice qué hay adentro, para que nadie tenga que
  * entrar a cada una para encontrar lo que busca.
  */
+/* Cinco solapas necesitan más aire que las tres de antes: con el ancho
+   anterior la explicación de cada una se partía en dos renglones. */
 .tabs {
-  max-width: 760px;
+  max-width: 1080px;
   margin: 0 auto 1.5rem;
   display: grid;
   grid-auto-flow: column;
@@ -854,18 +866,31 @@
   color: var(--itadaki-ink-soft);
 }
 
-/* En un teléfono el subtítulo sobra: no entra sin partir las palabras. */
+/* Con cinco solapas el subtítulo se parte antes que con tres. */
+@media (max-width: 900px) {
+  .tab-hint {
+    display: none;
+  }
+}
+
+/* En un teléfono cinco nombres no entran en una fila: se dejan deslizar
+   en vez de apretarlos hasta que se corten las palabras. */
 @media (max-width: 560px) {
   .tabs {
     margin-bottom: 1rem;
+    grid-auto-columns: minmax(6.5rem, auto);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .tab-hint {
-    display: none;
+  .tab {
+    scroll-snap-align: start;
   }
 
   .tab-name {
     font-size: 0.88rem;
+    white-space: nowrap;
   }
 }
 
@@ -1404,16 +1429,33 @@
  * pero disfrazarlo de función lista hace que el primero que lo toque deje de
  * creer el resto del panel.
  */
+/*
+ * Dos columnas cuando hay lugar: el porqué a la izquierda, los pasos y el
+ * botón a la derecha. En una sola columna angosta el texto quedaba apilado en
+ * el medio de una pantalla ancha, con todo el costado vacío.
+ */
 .soon {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-  align-items: flex-start;
-  max-width: 46rem;
-  padding: 1.4rem;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 1.2rem 2.4rem;
+  align-items: start;
+  padding: 1.8rem 2rem;
   border: 1.5px dashed var(--itadaki-border);
   border-radius: var(--itadaki-radius-card, 16px);
   background: var(--itadaki-surface-sunken);
+}
+
+/* La etiqueta manda sobre las dos columnas: rotula todo el bloque. */
+.soon-badge,
+.soon-lede {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .soon {
+    grid-template-columns: 1fr;
+    padding: 1.4rem;
+  }
 }
 
 .soon-badge {
@@ -1440,6 +1482,26 @@
   margin: 0;
   font-size: 0.88rem;
   line-height: 1.55;
+  color: var(--itadaki-ink-subtle);
+}
+
+/* La columna de la derecha: los pasos y la acción, juntos. */
+.soon-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--itadaki-radius-chip);
+  background: var(--itadaki-surface-raised);
+}
+
+.soon-steps-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--itadaki-ink-subtle);
 }
 
