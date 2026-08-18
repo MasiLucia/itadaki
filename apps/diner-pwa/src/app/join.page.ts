@@ -59,22 +59,28 @@ const SUGGESTIONS = ['Ana', 'Beto', 'Cami', 'Dani', 'Eli', 'Fede', 'Gaby', 'Nico
                prendida, el servidor lo rechaza y este mismo campo muestra por
                qué. Una pantalla que adivine la regla por su cuenta se
                desincroniza el día que la regla cambie. -->
-          <label class="code-label" for="join-code">Código de la mesa</label>
-          <p class="code-hint">
-            Si el mozo te dio uno al sentarte, ponelo acá. Si ya hay alguien de
-            tu mesa adentro, te puede invitar desde su teléfono.
-          </p>
-          <input
-            id="join-code"
-            class="input code"
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            maxlength="6"
-            placeholder="000000"
-            [value]="code()"
-            (input)="onCode($event)"
-          />
+          <!-- Plegado: la mayoría entra sin código, y un campo vacío a la
+               vista se lee como un paso obligatorio que hay que ir a
+               averiguar al salón. Se abre solo si el servidor lo reclama. -->
+          <details class="code-box" [open]="pideCodigo()">
+            <summary class="code-summary">Tengo un código de la mesa</summary>
+            <p class="code-hint">
+              Si el mozo te dio uno al sentarte, ponelo acá. Si ya hay alguien de
+              tu mesa adentro, te puede invitar desde su teléfono.
+            </p>
+            <input
+              id="join-code"
+              class="input code"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+              placeholder="000000"
+              aria-label="Código de la mesa"
+              [value]="code()"
+              (input)="onCode($event)"
+            />
+          </details>
         }
 
         @if (store.joinError(); as error) {
@@ -110,6 +116,19 @@ export class JoinPage {
   protected readonly puedeEntrar = computed(
     () => this.table.hasToken() || this.table.invite() !== null,
   );
+
+  /**
+   * El campo del código se abre solo cuando el servidor lo reclama.
+   *
+   * La pantalla no sabe si la exigencia está prendida, y no debe adivinarlo:
+   * quien manda es el servidor. Así que se intenta entrar sin código, y si
+   * responde que falta, el campo aparece abierto con el motivo al lado. Con
+   * la exigencia apagada, nadie ve un campo que no necesita.
+   */
+  protected readonly pideCodigo = computed(() => {
+    const error = this.store.joinError();
+    return error !== null && /c[oó]digo/i.test(error);
+  });
 
   protected onInput(event: Event): void {
     this.nickname.set((event.target as HTMLInputElement).value);

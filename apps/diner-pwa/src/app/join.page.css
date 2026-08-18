@@ -22,7 +22,21 @@
 }
 
 .error { color: white; background: var(--itadaki-accent); border-radius: var(--itadaki-radius-chip); padding: 0.6rem 0.8rem; font-size: 0.83rem; font-weight: 600; margin: 0; }
-.code-label { font-size: 0.8rem; font-weight: 700; color: var(--itadaki-ink-strong); margin: 0.3rem 0 0; }
+/* Plegado, para que no parezca un paso obligatorio de la entrada. */
+.code-box { display: flex; flex-direction: column; gap: 0.5rem; }
+.code-summary {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--itadaki-ink-subtle);
+  cursor: pointer;
+  padding: 0.35rem 0;
+  list-style: none;
+}
+.code-summary::-webkit-details-marker { display: none; }
+.code-summary::before { content: '＋ '; font-weight: 400; }
+.code-box[open] .code-summary { color: var(--itadaki-ink-strong); }
+.code-box[open] .code-summary::before { content: '－ '; }
+.code-summary:focus-visible { outline: 2px solid var(--itadaki-accent); outline-offset: 2px; border-radius: 4px; }
 .code-hint { font-size: 0.78rem; color: var(--itadaki-ink-subtle); margin: 0; line-height: 1.45; }
 .code-hint.invited { color: var(--itadaki-status-ready-fg); background: var(--itadaki-status-ready-bg); border-radius: var(--itadaki-radius-chip); padding: 0.6rem 0.8rem; font-weight: 600; }
 /* Dígitos separados y de ancho fijo: se dicta en voz alta y se compara de a uno. */

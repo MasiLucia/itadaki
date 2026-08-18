@@ -54,10 +54,28 @@ void bootstrapApplication(AppComponent, {
   console.error('bootstrap failed', error);
 });
 
+/**
+ * En desarrollo se saca de encima, en producción se instala.
+ *
+ * El worker y el navegador comparten origen entre una corrida de producción y
+ * el servidor de desarrollo, así que el que quedó instalado al probar un
+ * deploy seguía respondiendo en `localhost` y devolvía pantallas viejas: se
+ * editaba el código, compilaba bien, y en el navegador no cambiaba nada.
+ * Perseguir eso cuesta horas porque todo lo demás dice que está bien.
+ */
+const enDesarrollo =
+  globalThis.location.hostname === 'localhost' || globalThis.location.hostname === '127.0.0.1';
+
 if ('serviceWorker' in navigator) {
-  globalThis.addEventListener('load', () => {
-    void navigator.serviceWorker.register('sw.js').catch(() => {
-      // Offline support degrades to the IndexedDB cache; not fatal.
+  if (enDesarrollo) {
+    void navigator.serviceWorker.getRegistrations().then((registros) => {
+      for (const registro of registros) void registro.unregister();
     });
-  });
+  } else {
+    globalThis.addEventListener('load', () => {
+      void navigator.serviceWorker.register('sw.js').catch(() => {
+        // Offline support degrades to the IndexedDB cache; not fatal.
+      });
+    });
+  }
 }
