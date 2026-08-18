@@ -506,3 +506,30 @@
   color: white;
   font-weight: 700;
 }
+
+/* Lo que falló, dicho donde el mozo ya está mirando. */
+.action-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--itadaki-radius-chip);
+  background: var(--itadaki-accent-soft);
+  color: var(--itadaki-ink-strong);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.action-error .dismiss {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--itadaki-border);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}

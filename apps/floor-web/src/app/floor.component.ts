@@ -57,6 +57,17 @@ const CALL_LABELS: Record<string, string> = {
         </div>
       </header>
 
+      <!-- Cobrar y liberar se hacían en silencio si el servidor rechazaba: el
+           mozo tocaba, no pasaba nada, y no sabía si el toque había entrado. -->
+      @if (store.actionError(); as problema) {
+        <p class="action-error" role="alert">
+          {{ problema }}
+          <button type="button" class="dismiss" (click)="store.actionError.set(null)">
+            Entendido
+          </button>
+        </p>
+      }
+
       <!-- Calls first: a person is waiting, which outranks a plate on the pass. -->
       <section class="block" aria-labelledby="calls-title">
         <h2 class="block-title" id="calls-title">

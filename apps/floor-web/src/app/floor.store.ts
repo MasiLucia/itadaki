@@ -115,6 +115,16 @@ export class FloorStore {
     onCount: (pending) => this.pending.set(pending),
     onOffline: () => this.connected.set(false),
   });
+  /**
+   * Lo último que falló, para decirlo en pantalla.
+   *
+   * Cobrar y liberar se hacían en silencio cuando el servidor rechazaba: el
+   * mozo tocaba, no pasaba nada, y no tenía forma de saber si el toque no
+   * había entrado o si la mesa seguía ocupada. En un salón lleno eso termina
+   * en una mesa que nadie libera.
+   */
+  readonly actionError = signal<string | null>(null);
+
   readonly tickets = signal<readonly TicketDto[]>([]);
   readonly unsettled = signal<readonly UnsettledDto[]>([]);
   readonly tableCodes = signal<readonly TableCodeDto[]>([]);
@@ -283,15 +293,24 @@ export class FloorStore {
    * liberar aparte.
    */
   async chargeTable(sessionId: string): Promise<void> {
-    const response = await fetch(`${API}/bills/${sessionId}/settle`, {
-      method: 'POST',
-      headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
-    });
-    if (this.auth.expired(response)) return;
+    this.actionError.set(null);
+    try {
+      const response = await fetch(`${API}/bills/${sessionId}/settle`, {
+        method: 'POST',
+        headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
+      });
+      if (this.auth.expired(response)) return;
 
-    // La mesa que nunca pidió la cuenta la arma el servidor al cobrar: antes
-    // acá se caía a liberarla, y esa plata se cobraba sin quedar registrada.
-    if (response.ok) await this.refresh();
+      // La mesa que nunca pidió la cuenta la arma el servidor al cobrar: antes
+      // acá se caía a liberarla, y esa plata se cobraba sin quedar registrada.
+      if (response.ok) {
+        await this.refresh();
+        return;
+      }
+      this.actionError.set('No se pudo cobrar la mesa. Probá de nuevo.');
+    } catch {
+      this.actionError.set('Sin conexión — no se pudo cobrar');
+    }
   }
 
   /**
@@ -302,12 +321,30 @@ export class FloorStore {
    * siguiente escanea el QR y cae en el pedido de los anteriores.
    */
   async releaseTable(sessionId: string): Promise<void> {
-    const response = await fetch(`${API}/sessions/${sessionId}/release`, {
-      method: 'POST',
-      headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
-    });
-    if (this.auth.expired(response)) return;
-    if (response.ok) await this.refresh();
+    this.actionError.set(null);
+    try {
+      const response = await fetch(`${API}/sessions/${sessionId}/release`, {
+        method: 'POST',
+        headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
+      });
+      if (this.auth.expired(response)) return;
+
+      if (response.ok) {
+        await this.refresh();
+        return;
+      }
+
+      // La mesa que ya se liberó desde otro teléfono no es un error que valga
+      // mostrar: el mozo quería que quedara libre y quedó libre.
+      if (response.status === 404 || response.status === 409) {
+        await this.refresh();
+        return;
+      }
+
+      this.actionError.set('No se pudo liberar la mesa. Probá de nuevo.');
+    } catch {
+      this.actionError.set('Sin conexión — no se pudo liberar');
+    }
   }
 
   /** Lleva toda la mesa de una: es un viaje, no cuatro. */
