@@ -1536,3 +1536,55 @@
   font-size: 0.8rem;
   color: var(--itadaki-ink-subtle);
 }
+
+/*
+ * A quién le toca cada mesa.
+ *
+ * En la misma fila que la mesa y no en una pantalla aparte: repartir el salón
+ * se hace mirando la lista de mesas, no memorizando cuál es cuál.
+ */
+.table-assign {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  margin-right: 0.5rem;
+}
+
+.table-assign-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--itadaki-ink-subtle);
+}
+
+.table-assign-select {
+  border: 1px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-surface-raised);
+  padding: 0.4rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.83rem;
+  color: var(--itadaki-ink-strong);
+  cursor: pointer;
+  min-height: 36px;
+  max-width: 11rem;
+}
+
+@media (max-width: 700px) {
+  .table-row {
+    flex-wrap: wrap;
+  }
+
+  .table-assign {
+    order: 3;
+    width: 100%;
+    margin: 0.4rem 0 0;
+  }
+
+  .table-assign-select {
+    flex: 1;
+    max-width: none;
+  }
+}

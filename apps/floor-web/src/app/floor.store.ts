@@ -2,6 +2,7 @@ import { apiUrl, socketUrl } from '@itadaki/shared/domain';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { AuthStore } from '@itadaki/shared/ui-auth';
 import { OutboxDb } from '@itadaki/shared/offline';
+import { type TableAssignment, canSeeTable } from '@itadaki/ordering/domain';
 import { io, type Socket } from 'socket.io-client';
 
 const API = apiUrl();
@@ -125,6 +126,29 @@ export class FloorStore {
    */
   readonly actionError = signal<string | null>(null);
 
+  /**
+   * El reparto del salón: qué mozo atiende qué mesa.
+   *
+   * Vacío mientras no lo carguen, y ahí todos ven todo — que es lo correcto
+   * en un salón chico y también el primer día, antes de que nadie configure
+   * nada.
+   */
+  readonly assignments = signal<readonly TableAssignment[]>([]);
+
+  /** Si esta mesa le toca a quien está mirando la pantalla. */
+  readonly esMia = (tableId: string): boolean =>
+    canSeeTable(this.auth.profile()?.id ?? '', tableId, this.assignments());
+
+  /**
+   * Lo que el mozo tiene que atender, sin las mesas de sus compañeros.
+   *
+   * Es el motivo de todo el reparto: en un salón de veinte mesas, quien
+   * atiende seis veía los llamados y los platos de las catorce restantes
+   * mezclados con los suyos.
+   */
+  readonly misLlamados = computed(() => this.calls().filter((c) => this.esMia(c.tableId)));
+  readonly misImpagas = computed(() => this.unsettled().filter((m) => this.esMia(m.tableId)));
+
   readonly tickets = signal<readonly TicketDto[]>([]);
   readonly unsettled = signal<readonly UnsettledDto[]>([]);
   readonly tableCodes = signal<readonly TableCodeDto[]>([]);
@@ -160,7 +184,7 @@ export class FloorStore {
       { tableId: string; dishes: Pickup[]; waitingSince: number }
     >();
 
-    for (const pickup of this.pickups()) {
+    for (const pickup of this.pickups().filter((p) => this.esMia(p.tableId))) {
       const actual = mesas.get(pickup.tableId) ?? {
         tableId: pickup.tableId,
         dishes: [],
@@ -237,11 +261,12 @@ export class FloorStore {
 
   async refresh(): Promise<void> {
     try {
-      const [calls, orders, unsettled, codes] = await Promise.all([
+      const [calls, orders, unsettled, codes, assignments] = await Promise.all([
         fetch(`${API}/calls`, { headers: this.auth.headers() }),
         fetch(`${API}/orders`, { headers: this.auth.headers() }),
         fetch(`${API}/sessions/unsettled`, { headers: this.auth.headers() }),
         fetch(`${API}/sessions/codes`, { headers: this.auth.headers() }),
+        fetch(`${API}/tables/assignments`, { headers: this.auth.headers() }),
       ]);
 
       // A shift long enough to outlive the session ends here rather than
@@ -252,6 +277,9 @@ export class FloorStore {
       if (orders.ok) this.tickets.set((await orders.json()) as TicketDto[]);
       if (unsettled.ok) this.unsettled.set((await unsettled.json()) as UnsettledDto[]);
       if (codes.ok) this.tableCodes.set((await codes.json()) as TableCodeDto[]);
+      if (assignments.ok) {
+        this.assignments.set((await assignments.json()) as TableAssignment[]);
+      }
     } catch {
       // Keep the last known room; the next event or reconnect retries.
     }

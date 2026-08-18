@@ -72,12 +72,12 @@ const CALL_LABELS: Record<string, string> = {
       <section class="block" aria-labelledby="calls-title">
         <h2 class="block-title" id="calls-title">
           Te están llamando
-          @if (store.calls().length > 0) {
-            <span class="count">{{ store.calls().length }}</span>
+          @if (store.misLlamados().length > 0) {
+            <span class="count">{{ store.misLlamados().length }}</span>
           }
         </h2>
 
-        @for (call of store.calls(); track call.id) {
+        @for (call of store.misLlamados(); track call.id) {
           <article class="card call">
             <div class="card-main">
               <span class="table">Mesa {{ tableNumber(call.tableId) }}</span>
@@ -110,14 +110,14 @@ const CALL_LABELS: Record<string, string> = {
       <!-- Mesas que ya comieron todo y no pagaron. Sólo aparece cuando hay:
            es una alerta, no una vista. Sin esto la mesa salía del tablero al
            entregarse el último plato y el mozo no tenía dónde verla. -->
-      @if (store.unsettled().length > 0) {
+      @if (store.misImpagas().length > 0) {
         <section class="block owing" aria-labelledby="owing-title">
           <h2 class="block-title" id="owing-title">
             Sin cobrar
-            <span class="count owed">{{ store.unsettled().length }}</span>
+            <span class="count owed">{{ store.misImpagas().length }}</span>
           </h2>
 
-          @for (mesa of store.unsettled(); track mesa.sessionId) {
+          @for (mesa of store.misImpagas(); track mesa.sessionId) {
             <article class="card owing-card">
               <div class="card-main">
                 <span class="table">Mesa {{ tableNumber(mesa.tableId) }}</span>

@@ -15,6 +15,7 @@ import { DecimalPipe } from '@angular/common';
 import { MAX_DISHES, csvToMenuText, parseMenuText } from '@itadaki/catalog/domain';
 import { QrSheetComponent } from './qr-sheet.component';
 import { MetricsComponent } from './metrics.component';
+import { type TableAssignment } from '@itadaki/ordering/domain';
 
 /**
  * Las tres cosas distintas que hace un dueño acá.
@@ -371,6 +372,10 @@ const ROLE_NAMES: Record<string, string> = {
       @if (activeTab() === 'local') {
       <section class="panel">
         <h2 class="panel-title">Mesas y códigos QR</h2>
+        <p class="panel-lede">
+          Si repartís las mesas, cada mozo abre su app y ve solamente su sector.
+          Las que dejes en "todo el salón" las siguen viendo todos.
+        </p>
         <details class="details manage-tables" open>
           <summary>Ver las mesas</summary>
 
@@ -381,6 +386,25 @@ const ROLE_NAMES: Record<string, string> = {
                   <span class="table-label">{{ table.label }}</span>
                   <span class="table-seats">{{ table.seats }} lugares</span>
                 </div>
+
+                <!-- Quién atiende esta mesa. Sin nadie elegido la ve todo el
+                     salón, que es lo correcto en un local que no reparte. -->
+                @if (waiters().length > 0) {
+                  <label class="table-assign">
+                    <span class="table-assign-label">Atiende</span>
+                    <select
+                      class="table-assign-select"
+                      [value]="assignedTo(table.id)"
+                      (change)="onAssign(table.id, $event)"
+                    >
+                      <option value="">Todo el salón</option>
+                      @for (mozo of waiters(); track mozo.id) {
+                        <option [value]="mozo.id">{{ mozo.displayName }}</option>
+                      }
+                    </select>
+                  </label>
+                }
+
                 <div class="table-actions">
                   <button type="button" class="table-copy" (click)="copyLink(table)">
                     {{ copied() === table.id ? '¡Copiado!' : 'Copiar link' }}
@@ -856,6 +880,25 @@ export class AdminComponent {
   protected readonly showQrSheet = signal(false);
   protected readonly apiUrl = API;
   protected readonly staff = signal<readonly StaffMember[]>([]);
+
+  /**
+   * Qué mozo atiende qué mesa.
+   *
+   * Vacío es un estado válido y es el que trae todo salón nuevo: mientras
+   * nadie reparta, cada mozo ve el salón entero, que es lo correcto en un
+   * local chico.
+   */
+  protected readonly assignments = signal<readonly TableAssignment[]>([]);
+
+  /** Sólo los mozos: al encargado y a la cocina no se les reparte sector. */
+  protected readonly waiters = computed(() =>
+    this.staff().filter((member) => member.active && member.role === 'WAITER'),
+  );
+
+  /** El mozo de una mesa, o cadena vacía si no tiene. */
+  protected assignedTo(tableId: string): string {
+    return this.assignments().find((a) => a.tableId === tableId)?.staffId ?? '';
+  }
   protected readonly staffError = signal<string | null>(null);
   protected readonly trial = signal<{
     status: string;
@@ -1252,6 +1295,49 @@ export class AdminComponent {
     if (response.ok) {
       this.staff.set((await response.json()) as StaffMember[]);
     }
+
+    const reparto = await this.auth.apiFetch(`${API}/tables/assignments`, {
+      headers: this.auth.headers(),
+    });
+    if (reparto.ok) {
+      this.assignments.set((await reparto.json()) as TableAssignment[]);
+    }
+  }
+
+  /**
+   * Cambia el mozo de una mesa, o se la saca.
+   *
+   * Sin mozo elegido borra la asignación en vez de guardar una vacía: una
+   * mesa sin dueño la ve todo el salón, que es el estado por defecto.
+   */
+  protected async assignTable(tableId: string, staffId: string): Promise<void> {
+    this.staffError.set(null);
+
+    const response = await this.auth.apiFetch(
+      `${API}/tables/${tableId}/assign`,
+      staffId === ''
+        ? { method: 'DELETE', headers: this.auth.headers() }
+        : {
+            method: 'POST',
+            headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ staffId }),
+          },
+    );
+
+    if (!response.ok) {
+      this.staffError.set('No se pudo guardar el reparto. Probá de nuevo.');
+      return;
+    }
+
+    this.assignments.update((current) => {
+      const sin = current.filter((a) => a.tableId !== tableId);
+      return staffId === '' ? sin : [...sin, { tableId, staffId }];
+    });
+  }
+
+  /** Lo elegido en el desplegable de una mesa. */
+  protected onAssign(tableId: string, event: Event): void {
+    void this.assignTable(tableId, (event.target as HTMLSelectElement).value);
   }
 
   protected async inviteStaff(event: Event): Promise<void> {

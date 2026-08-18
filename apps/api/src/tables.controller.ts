@@ -1,5 +1,15 @@
-import { Body, Controller, Get, HttpException, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpException,
+  HttpStatus,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { PostgresTableStore, signTableToken } from '@itadaki/identity/infra';
+import { PostgresAssignmentStore } from '@itadaki/ordering/infra';
 import { z } from 'zod';
 import { RequirePermission, TenantId } from './auth';
 import { database } from './database';
@@ -9,6 +19,7 @@ const DINER_APP_URL = process.env['DINER_APP_URL'] ?? 'http://localhost:4200';
 @Controller('tables')
 export class TablesController {
   private readonly tables = new PostgresTableStore(database);
+  private readonly assignments = new PostgresAssignmentStore(database);
 
   /** Lists tables with a freshly minted QR link for each. */
   @RequirePermission('menu:read')
@@ -94,4 +105,49 @@ export class TablesController {
     const token = signTableToken({ tenantId, tableId, issuedAt: now }, secret);
     return `${DINER_APP_URL}/bienvenida?t=${encodeURIComponent(token)}`;
   }
+
+  /**
+   * El reparto del salón: qué mozo atiende qué mesa.
+   *
+   * Lo lee el panel para dibujarlo y lo lee el salón para filtrar su tablero,
+   * así que pide `orders:read` y no `menu:write`: el mozo tiene que poder
+   * saber cuáles son sus mesas sin poder cambiar el reparto.
+   */
+  @RequirePermission('orders:read')
+  @Get('assignments')
+  async listAssignments(@TenantId() tenantId: string) {
+    const found = await this.assignments.list(tenantId);
+    if (found.isErr()) {
+      throw new HttpException(found.error, HttpStatus.BAD_GATEWAY);
+    }
+    return found.value;
+  }
+
+  /** Pone o cambia el mozo de una mesa. Repartir es tarea de quien organiza. */
+  @RequirePermission('staff:manage')
+  @Post(':id/assign')
+  async assign(@Param('id') tableId: string, @Body() body: unknown, @TenantId() tenantId: string) {
+    const parsed = z.object({ staffId: z.string().min(1) }).safeParse(body);
+    if (!parsed.success) {
+      throw new HttpException(parsed.error.issues, HttpStatus.BAD_REQUEST);
+    }
+
+    const done = await this.assignments.assign(tenantId, tableId, parsed.data.staffId);
+    if (done.isErr()) {
+      throw new HttpException(done.error, HttpStatus.BAD_GATEWAY);
+    }
+    return { tableId, staffId: parsed.data.staffId };
+  }
+
+  /** Saca el dueño de una mesa: vuelve a verla todo el salón. */
+  @RequirePermission('staff:manage')
+  @Delete(':id/assign')
+  async unassign(@Param('id') tableId: string, @TenantId() tenantId: string) {
+    const done = await this.assignments.clear(tenantId, tableId);
+    if (done.isErr()) {
+      throw new HttpException(done.error, HttpStatus.BAD_GATEWAY);
+    }
+    return { tableId, staffId: null };
+  }
+
 }

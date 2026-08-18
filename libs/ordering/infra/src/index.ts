@@ -9,3 +9,7 @@ export {
   type Invite,
   type InviteError,
 } from './lib/postgres-invites';
+export {
+  PostgresAssignmentStore,
+  type AssignmentError,
+} from './lib/postgres-assignments';

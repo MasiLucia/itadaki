@@ -80,3 +80,10 @@ export {
   TABS_BELOW,
 } from './lib/table-board';
 export { placedTotals } from './lib/placed-totals';
+export {
+  type TableAssignment,
+  assignmentsByStaff,
+  canSeeTable,
+  seesEveryTable,
+  tablesFor,
+} from './lib/table-assignment';
