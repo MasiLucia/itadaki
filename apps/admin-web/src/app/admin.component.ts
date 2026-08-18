@@ -15,7 +15,7 @@ import { DecimalPipe } from '@angular/common';
 import { MAX_DISHES, csvToMenuText, parseMenuText } from '@itadaki/catalog/domain';
 import { QrSheetComponent } from './qr-sheet.component';
 import { MetricsComponent } from './metrics.component';
-import { type TableAssignment } from '@itadaki/ordering/domain';
+import { type TableAssignment, orphanedTables } from '@itadaki/ordering/domain';
 
 /**
  * Las tres cosas distintas que hace un dueño acá.
@@ -376,6 +376,26 @@ const ROLE_NAMES: Record<string, string> = {
           Si repartís las mesas, cada mozo abre su app y ve solamente su sector.
           Las que dejes en "todo el salón" las siguen viendo todos.
         </p>
+
+        <!-- El aviso del confirm se ve una vez y se olvida. Esto queda hasta
+             que alguien lo resuelva, porque una mesa que no aparece en la app
+             de nadie no se nota hasta que el cliente reclama. -->
+        @if (orphaned().length > 0) {
+          <p class="orphan-warn" role="alert">
+            <strong>
+              {{ orphaned().length === 1 ? 'Una mesa quedó' : orphaned().length + ' mesas quedaron' }}
+              sin mozo.
+            </strong>
+            @for (id of orphaned(); track id) {
+              <span class="orphan-table">{{ tableLabel(id) }}</span>
+            }
+            <span class="orphan-why">
+              {{ orphaned().length === 1 ? 'Está' : 'Están' }} asignadas a alguien que ya no
+              trabaja acá, así que no {{ orphaned().length === 1 ? 'aparece' : 'aparecen' }} en la
+              app de ningún mozo. Elegí otro abajo, o dejalas en "todo el salón".
+            </span>
+          </p>
+        }
         <details class="details manage-tables" open>
           <summary>Ver las mesas</summary>
 
@@ -899,6 +919,26 @@ export class AdminComponent {
   protected assignedTo(tableId: string): string {
     return this.assignments().find((a) => a.tableId === tableId)?.staffId ?? '';
   }
+
+  /** El nombre del cartelito, para hablar de la mesa como la llama el salón. */
+  protected tableLabel(tableId: string): string {
+    return this.tables().find((t) => t.id === tableId)?.label ?? tableId;
+  }
+
+  /**
+   * Mesas asignadas a alguien que ya no puede entrar.
+   *
+   * Dar de baja a un mozo no borra su ficha —se desactiva, para poder
+   * reactivarlo— así que sus mesas siguen asignadas a él y no aparecen en la
+   * app de nadie. El aviso al dar de baja se ve una vez y se olvida; esto
+   * queda hasta que alguien lo resuelva.
+   */
+  protected readonly orphaned = computed(() =>
+    orphanedTables(
+      this.assignments(),
+      this.staff().filter((m) => m.active).map((m) => m.id),
+    ),
+  );
   protected readonly staffError = signal<string | null>(null);
   protected readonly trial = signal<{
     status: string;
@@ -1381,8 +1421,22 @@ export class AdminComponent {
   /** Revoking access is reversible, so it confirms but does not alarm. */
   protected async toggleStaff(member: StaffMember): Promise<void> {
     if (member.active) {
+      // Sus mesas se dicen antes, no después: dar de baja al mozo del fondo
+      // un viernes deja esas mesas sin nadie que las vea en su app, y quien
+      // lo hace no tiene forma de saberlo si no se lo decimos acá.
+      const suyas = this.assignments()
+        .filter((a) => a.staffId === member.id)
+        .map((a) => this.tableLabel(a.tableId));
+
+      const aviso =
+        suyas.length === 0
+          ? ''
+          : `\n\nAtiende ${suyas.length === 1 ? 'la' : 'las'} ${suyas.join(', ')}. ` +
+            `${suyas.length === 1 ? 'Esa mesa queda' : 'Esas mesas quedan'} sin mozo asignado ` +
+            `hasta que ${suyas.length === 1 ? 'la' : 'las'} pases a otro.`;
+
       const ok = globalThis.confirm(
-        `Dar de baja a ${member.displayName}?\n\nNo va a poder entrar hasta que lo reactives.`,
+        `Dar de baja a ${member.displayName}?\n\nNo va a poder entrar hasta que lo reactives.${aviso}`,
       );
       if (!ok) return;
     }

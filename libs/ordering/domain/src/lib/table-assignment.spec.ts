@@ -2,6 +2,7 @@ import {
   type TableAssignment,
   assignmentsByStaff,
   canSeeTable,
+  orphanedTables,
   seesEveryTable,
   tablesFor,
 } from './table-assignment';
@@ -70,5 +71,28 @@ describe('qué mesas ve cada mozo', () => {
 
   it('no inventa mozos que no reparten nada', () => {
     expect(assignmentsByStaff([]).size).toBe(0);
+  });
+});
+
+describe('mesas que quedan sin mozo', () => {
+  it('marca las del mozo dado de baja', () => {
+    // Dar de baja no borra la ficha, se desactiva: la mesa sigue asignada a
+    // alguien que ya no puede entrar, así que nadie la ve en su app.
+    const reparto = [asignar('mesa-1', 'ana'), asignar('mesa-2', 'beto')];
+    expect(orphanedTables(reparto, ['ana'])).toEqual(['mesa-2']);
+  });
+
+  it('no marca nada si están todos activos', () => {
+    const reparto = [asignar('mesa-1', 'ana'), asignar('mesa-2', 'beto')];
+    expect(orphanedTables(reparto, ['ana', 'beto'])).toEqual([]);
+  });
+
+  it('las lista todas si se fue el único mozo del reparto', () => {
+    const reparto = [asignar('mesa-1', 'ana'), asignar('mesa-2', 'ana')];
+    expect(orphanedTables(reparto, [])).toEqual(['mesa-1', 'mesa-2']);
+  });
+
+  it('sin reparto no hay nada que quede huérfano', () => {
+    expect(orphanedTables([], ['ana'])).toEqual([]);
   });
 });

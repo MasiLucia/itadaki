@@ -71,3 +71,19 @@ export function assignmentsByStaff(
   }
   return grouped;
 }
+
+/**
+ * Las mesas que quedan sin quien las atienda.
+ *
+ * Dar de baja a un mozo no borra su ficha —se desactiva, para poder
+ * reactivarlo— así que sus mesas siguen asignadas a alguien que ya no puede
+ * entrar. Nadie las ve en su app y nadie se entera: quedan huérfanas en
+ * silencio hasta que un cliente reclama.
+ */
+export function orphanedTables(
+  assignments: readonly TableAssignment[],
+  activeStaffIds: readonly string[],
+): readonly string[] {
+  const activos = new Set(activeStaffIds);
+  return assignments.filter((a) => !activos.has(a.staffId)).map((a) => a.tableId);
+}

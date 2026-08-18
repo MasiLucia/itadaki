@@ -84,6 +84,7 @@ export {
   type TableAssignment,
   assignmentsByStaff,
   canSeeTable,
+  orphanedTables,
   seesEveryTable,
   tablesFor,
 } from './lib/table-assignment';
