@@ -86,11 +86,13 @@
  * derecha. Con solapas cada tarea tiene su propia pantalla, así que el
  * contenido se centra y respira.
  */
+/* El aire entre paneles es lo que dice que son temas distintos: con poco,
+   la pantalla se lee como una lista larga y lo de abajo parece perdido. */
 .layout {
   max-width: 760px;
   margin: 0 auto;
   display: grid;
-  gap: 1.25rem;
+  gap: 2.25rem;
   align-items: start;
 }
 
@@ -123,8 +125,21 @@
 .panel {
   background: var(--itadaki-surface-raised);
   border-radius: var(--itadaki-radius-panel);
-  padding: 1.5rem;
+  padding: 2rem 2.25rem 2.25rem;
   box-shadow: var(--itadaki-shadow-card);
+}
+
+/* Qué es este panel, antes de la primera fila. */
+.panel-lede {
+  margin: -0.2rem 0 1.2rem;
+  max-width: 52ch;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--itadaki-ink-subtle);
+}
+
+@media (max-width: 560px) {
+  .panel { padding: 1.4rem 1.2rem 1.6rem; }
 }
 
 .panel-title {

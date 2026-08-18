@@ -370,9 +370,9 @@ const ROLE_NAMES: Record<string, string> = {
       <!-- Tu local: mesas, equipo y ventas. -->
       @if (activeTab() === 'local') {
       <section class="panel">
-        <h2 class="panel-title">Mesas y equipo</h2>
-        <details class="details manage-tables">
-          <summary>Mesas y códigos QR</summary>
+        <h2 class="panel-title">Mesas y códigos QR</h2>
+        <details class="details manage-tables" open>
+          <summary>Ver las mesas</summary>
 
           <div class="table-list">
             @for (table of tables(); track table.id) {
@@ -418,9 +418,17 @@ const ROLE_NAMES: Record<string, string> = {
           </p>
         </details>
 
-        @if (auth.can('staff:manage')) {
-          <details class="details manage-staff">
-            <summary>Tu equipo</summary>
+      </section>
+
+      @if (auth.can('staff:manage')) {
+        <section class="panel">
+          <h2 class="panel-title">Tu equipo</h2>
+          <p class="panel-lede">
+            Quién entra a cada pantalla. La cocina no toca precios y el mozo no
+            edita la carta.
+          </p>
+          <details class="details manage-staff" open>
+            <summary>Ver el equipo</summary>
 
             <div class="staff-list">
               @for (member of staff(); track member.id) {
@@ -479,10 +487,8 @@ const ROLE_NAMES: Record<string, string> = {
               Le pasás vos la contraseña; después la puede seguir usando para entrar.
             </p>
           </details>
-        }
-
-      </section>
-
+        </section>
+      }
       }
 
       @if (activeTab() === 'ventas') {
