@@ -377,15 +377,51 @@ const ROLE_NAMES: Record<string, string> = {
         <details class="details manage-tables" open>
           <summary>Ver las mesas</summary>
 
+          @if (tableError(); as message) {
+            <p class="status error" role="alert">{{ message }}</p>
+          }
+
           <div class="table-list">
             @for (table of tables(); track table.id) {
               <div class="table-row">
+                @if (editingTable() === table.id) {
+                  <!-- Se edita en la misma fila: abrir otra pantalla para
+                       corregir un nombre hace perder de vista el resto del
+                       salón, que es contra lo que se compara al renombrar. -->
+                  <form class="table-edit" (submit)="saveTable(table, $event)">
+                    <input
+                      class="table-edit-label"
+                      name="label"
+                      [value]="table.label"
+                      maxlength="40"
+                      required
+                      aria-label="Nombre de la mesa"
+                    />
+                    <input
+                      class="table-edit-seats"
+                      name="seats"
+                      type="number"
+                      [value]="table.seats"
+                      min="1"
+                      max="30"
+                      required
+                      aria-label="Lugares"
+                    />
+                    <button type="submit" class="table-save">Guardar</button>
+                    <button type="button" class="table-cancel" (click)="editingTable.set(null)">
+                      Cancelar
+                    </button>
+                  </form>
+                } @else {
                 <div class="table-info">
                   <span class="table-label">{{ table.label }}</span>
                   <span class="table-seats">{{ table.seats }} lugares</span>
                 </div>
 
                 <div class="table-actions">
+                  <button type="button" class="table-edit-btn" (click)="editingTable.set(table.id)">
+                    Editar
+                  </button>
                   <button type="button" class="table-copy" (click)="copyLink(table)">
                     {{ copied() === table.id ? '¡Copiado!' : 'Copiar link' }}
                   </button>
@@ -397,7 +433,16 @@ const ROLE_NAMES: Record<string, string> = {
                   >
                     Renovar QR
                   </button>
+                  <button
+                    type="button"
+                    class="table-delete"
+                    (click)="removeTable(table)"
+                    title="Saca la mesa del salón"
+                  >
+                    Borrar
+                  </button>
                 </div>
+                }
               </div>
             } @empty {
               <p class="muted">Todavía no cargaste ninguna mesa.</p>
@@ -947,6 +992,76 @@ export class AdminComponent {
   /** El mozo de una mesa, o cadena vacía si no tiene. */
   protected assignedTo(tableId: string): string {
     return this.assignments().find((a) => a.tableId === tableId)?.staffId ?? '';
+  }
+
+  /** La mesa que se está editando en la lista, o null. */
+  protected readonly editingTable = signal<string | null>(null);
+
+  /** Lo que falló al tocar una mesa, dicho arriba de la lista. */
+  protected readonly tableError = signal<string | null>(null);
+
+  /**
+   * Guarda el nombre y los lugares.
+   *
+   * El id no cambia aunque cambie el nombre: de él cuelga el QR pegado en la
+   * mesa, y renombrarla no puede obligar a reimprimirlo.
+   */
+  protected async saveTable(table: RestaurantTable, event: Event): Promise<void> {
+    event.preventDefault();
+    this.tableError.set(null);
+
+    const data = new FormData(event.target as HTMLFormElement);
+    const label = String(data.get('label') ?? '').trim();
+    const seats = Number(data.get('seats') ?? 0);
+    if (label === '' || !Number.isFinite(seats)) return;
+
+    const response = await this.auth.apiFetch(`${API}/tables/${table.id}`, {
+      method: 'PATCH',
+      headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label, seats }),
+    });
+
+    if (!response.ok) {
+      this.tableError.set('No se pudo guardar la mesa. Probá de nuevo.');
+      return;
+    }
+
+    this.editingTable.set(null);
+    await this.loadTables();
+  }
+
+  /**
+   * Saca una mesa del salón.
+   *
+   * Pregunta antes porque no se deshace, y dice qué se lleva puesto: el QR
+   * pegado en esa mesa deja de servir.
+   */
+  protected async removeTable(table: RestaurantTable): Promise<void> {
+    this.tableError.set(null);
+
+    const ok = globalThis.confirm(
+      `Borrar ${table.label}?\n\n` +
+        'El QR pegado en esa mesa deja de funcionar. Las ventas que ya pasaron por ' +
+        'ella se conservan.',
+    );
+    if (!ok) return;
+
+    const response = await this.auth.apiFetch(`${API}/tables/${table.id}`, {
+      method: 'DELETE',
+      headers: this.auth.headers(),
+    });
+
+    if (!response.ok) {
+      const detail = (await response.json().catch(() => null)) as { kind?: string } | null;
+      this.tableError.set(
+        detail?.kind === 'TABLE_IN_USE'
+          ? `${table.label} tiene gente sentada. Cerrá su cuenta antes de borrarla.`
+          : 'No se pudo borrar la mesa. Probá de nuevo.',
+      );
+      return;
+    }
+
+    await this.loadTables();
   }
 
   /** El nombre del cartelito, para hablar de la mesa como la llama el salón. */

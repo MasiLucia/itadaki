@@ -26,6 +26,8 @@ export interface RestaurantTable {
 
 export type TableError =
   | { readonly kind: 'NOT_FOUND'; readonly id: string }
+  /** Tiene gente sentada: el salón cambia de forma cuando está vacío. */
+  | { readonly kind: 'TABLE_IN_USE'; readonly id: string }
   | { readonly kind: 'STORAGE_FAILURE'; readonly detail: string };
 
 interface TableRow {
@@ -130,6 +132,41 @@ export class PostgresTableStore {
       });
       const saved = await this.find(table.tenantId, table.id);
       return saved.isErr() ? err(saved.error) : ok(saved.value);
+    } catch (error) {
+      return err({ kind: 'STORAGE_FAILURE', detail: String(error) });
+    }
+  }
+
+  /**
+   * Saca una mesa del salón.
+   *
+   * Se niega si tiene gente sentada: borrarla dejaría a esa mesa pidiendo
+   * contra algo que ya no existe, y su cuenta sin dónde cobrarse. El salón
+   * cambia de forma cuando está vacío, no en medio del servicio.
+   *
+   * Lo que cuelga de la mesa —su reparto entre mozos— se va por cascada. Las
+   * sesiones viejas ya cerradas se conservan: son la historia de ventas, y
+   * borrarlas al sacar una mesa falsearía los números de meses anteriores.
+   */
+  async remove(tenantId: string, tableId: string): Promise<Result<void, TableError>> {
+    try {
+      const ocupada = await this.db.withTenant(tenantId, async (client) => {
+        const result = await client.query<{ total: string }>(
+          `SELECT count(*) AS total FROM table_sessions
+            WHERE table_id = $1 AND status = 'OPEN'`,
+          [tableId],
+        );
+        return Number(result.rows[0]?.total ?? 0) > 0;
+      });
+
+      if (ocupada) return err({ kind: 'TABLE_IN_USE', id: tableId });
+
+      const borradas = await this.db.withTenant(tenantId, async (client) => {
+        const result = await client.query('DELETE FROM restaurant_tables WHERE id = $1', [tableId]);
+        return result.rowCount ?? 0;
+      });
+
+      return borradas === 0 ? err({ kind: 'NOT_FOUND', id: tableId }) : ok(undefined);
     } catch (error) {
       return err({ kind: 'STORAGE_FAILURE', detail: String(error) });
     }
