@@ -113,7 +113,7 @@ const CALL_LABELS: Record<string, string> = {
       @if (store.misImpagas().length > 0) {
         <section class="block owing" aria-labelledby="owing-title">
           <h2 class="block-title" id="owing-title">
-            Sin cobrar
+            Pendiente de cobro
             <span class="count owed">{{ store.misImpagas().length }}</span>
           </h2>
 
