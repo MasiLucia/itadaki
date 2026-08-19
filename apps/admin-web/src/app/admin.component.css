@@ -1636,3 +1636,87 @@
   cursor: default;
   background: transparent;
 }
+
+/*
+ * Editar una mesa en su propia fila.
+ *
+ * Abrir otra pantalla para corregir un nombre hace perder de vista el resto
+ * del salón, que es justamente contra lo que se compara al renombrar: "Mesa
+ * 5" sólo tiene sentido al lado de la 4 y la 6.
+ */
+.table-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.table-edit-label,
+.table-edit-seats {
+  border: 1px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-chip);
+  background: var(--itadaki-surface-raised);
+  padding: 0.5rem 0.7rem;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--itadaki-ink-strong);
+  min-height: 40px;
+}
+
+.table-edit-label {
+  flex: 1;
+  min-width: 8rem;
+}
+
+.table-edit-seats {
+  width: 5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-save {
+  padding: 0.5rem 0.9rem;
+  border: none;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-accent);
+  color: white;
+  font: inherit;
+  font-size: 0.83rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.table-cancel,
+.table-edit-btn {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-pill);
+  background: transparent;
+  color: var(--itadaki-ink-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+/* Borrar se apaga hasta que se lo busca: no compite con copiar el link, que
+   es lo que se hace todos los días. */
+.table-delete {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: var(--itadaki-radius-pill);
+  background: transparent;
+  color: var(--itadaki-ink-subtle);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.table-delete:hover {
+  border-color: var(--itadaki-status-late);
+  color: var(--itadaki-status-late);
+}

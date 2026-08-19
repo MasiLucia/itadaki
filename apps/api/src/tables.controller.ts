@@ -6,9 +6,10 @@ import {
   HttpException,
   HttpStatus,
   Param,
+  Patch,
   Post,
 } from '@nestjs/common';
-import { PostgresTableStore, signTableToken } from '@itadaki/identity/infra';
+import { PostgresStaffStore, PostgresTableStore, signTableToken } from '@itadaki/identity/infra';
 import { PostgresAssignmentStore, PostgresShiftStore } from '@itadaki/ordering/infra';
 import { z } from 'zod';
 import { Auth, RequirePermission, TenantId, type AuthContext } from './auth';
@@ -21,6 +22,7 @@ export class TablesController {
   private readonly tables = new PostgresTableStore(database);
   private readonly assignments = new PostgresAssignmentStore(database);
   private readonly shifts = new PostgresShiftStore(database);
+  private readonly staff = new PostgresStaffStore(database);
 
   /** Lists tables with a freshly minted QR link for each. */
   @RequirePermission('menu:read')
@@ -79,6 +81,8 @@ export class TablesController {
       url: this.linkFor(tenantId, saved.value.id, saved.value.secret, Date.now()),
     };
   }
+
+
 
   /** Invalidates every QR printed for this table. */
   @RequirePermission('menu:write')
@@ -166,8 +170,16 @@ export class TablesController {
     if (found.isErr()) {
       throw new HttpException(found.error, HttpStatus.BAD_GATEWAY);
     }
+    // Con el nombre, no sólo el id: la pantalla del salón muestra quién entró
+    // al turno, y "d2c51e24-..." no le dice nada a nadie.
+    const equipo = await this.staff.listForTenant(tenantId);
+    const nombres = new Map(
+      equipo.isOk() ? equipo.value.map((member) => [member.id, member.displayName]) : [],
+    );
+
     return found.value.map((shift) => ({
       staffId: shift.staffId,
+      displayName: nombres.get(shift.staffId) ?? shift.staffId,
       lastSeen: shift.lastSeen.toISOString(),
     }));
   }
@@ -198,6 +210,71 @@ export class TablesController {
       throw new HttpException(done.error, HttpStatus.BAD_GATEWAY);
     }
     return { staffId: user.userId, inShift: false };
+  }
+
+  /**
+   * Cambia el nombre o la cantidad de lugares.
+   *
+   * El id no se toca aunque cambie el nombre: de él cuelga el QR impreso y
+   * pegado en la mesa. Renombrar "Mesa 5" a "Ventana 2" tiene que dejar el
+   * cartelito funcionando, o cada corrección de nombre obligaría a reimprimir.
+   */
+  @RequirePermission('menu:write')
+  @Patch(':id')
+  async edit(@Param('id') tableId: string, @Body() body: unknown, @TenantId() tenantId: string) {
+    const parsed = z
+      .object({
+        label: z.string().min(1).max(40),
+        seats: z.number().int().min(1).max(30),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      throw new HttpException(parsed.error.issues, HttpStatus.BAD_REQUEST);
+    }
+
+    const existente = await this.tables.find(tenantId, tableId);
+    if (existente.isErr()) {
+      throw new HttpException(existente.error, HttpStatus.NOT_FOUND);
+    }
+
+    const saved = await this.tables.save({
+      tenantId,
+      id: tableId,
+      label: parsed.data.label,
+      seats: parsed.data.seats,
+    });
+    if (saved.isErr()) {
+      throw new HttpException(saved.error, HttpStatus.BAD_GATEWAY);
+    }
+
+    return {
+      id: saved.value.id,
+      label: saved.value.label,
+      seats: saved.value.seats,
+      url: this.linkFor(tenantId, saved.value.id, saved.value.secret, Date.now()),
+    };
+  }
+
+  /**
+   * Saca una mesa del salón.
+   *
+   * Se niega si tiene gente sentada: borrarla dejaría a esa mesa pidiendo
+   * contra algo que ya no existe y su cuenta sin dónde cobrarse.
+   */
+  @RequirePermission('menu:write')
+  @Delete(':id')
+  async remove(@Param('id') tableId: string, @TenantId() tenantId: string) {
+    const done = await this.tables.remove(tenantId, tableId);
+    if (done.isErr()) {
+      const status =
+        done.error.kind === 'TABLE_IN_USE'
+          ? HttpStatus.CONFLICT
+          : done.error.kind === 'NOT_FOUND'
+            ? HttpStatus.NOT_FOUND
+            : HttpStatus.BAD_GATEWAY;
+      throw new HttpException(done.error, status);
+    }
+    return { id: tableId, removed: true };
   }
 
 }
