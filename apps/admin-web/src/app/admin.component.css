@@ -1623,3 +1623,96 @@
   font-weight: 400;
   color: var(--itadaki-ink-subtle);
 }
+
+/*
+ * El reparto del salón, de un vistazo.
+ *
+ * Con un desplegable por fila hacía falta abrir veinte menús para saber quién
+ * tenía qué, y el reparto completo no se veía en ningún lado. Acá cada mozo
+ * es una columna y las mesas se tocan para moverlas.
+ */
+.sectors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.sector {
+  padding: 1rem;
+  border: 1px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-card);
+  background: var(--itadaki-surface);
+}
+
+.sector.free {
+  border-style: dashed;
+  background: transparent;
+}
+
+.sector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0 0 0.7rem;
+}
+
+.sector-name {
+  font-family: var(--itadaki-font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--itadaki-ink-strong);
+}
+
+.sector-count {
+  padding: 0.1rem 0.55rem;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-surface-sunken);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--itadaki-ink-subtle);
+}
+
+.sector-hint {
+  margin: 0 0 0.6rem;
+  font-size: 0.78rem;
+  color: var(--itadaki-ink-subtle);
+}
+
+.sector-tables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* Apagada es "no es de este mozo"; encendida es "sí". El toque las alterna. */
+.sector-chip {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-surface-raised);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-subtle);
+  cursor: pointer;
+  min-height: 36px;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.sector-chip:hover {
+  border-color: var(--itadaki-ink-faint);
+}
+
+.sector-chip.on {
+  border-color: var(--itadaki-accent);
+  background: var(--itadaki-accent);
+  color: white;
+}
+
+/* Las de nadie no se tocan desde acá: se mueven eligiéndolas en un sector. */
+.sector-chip.idle {
+  cursor: default;
+  background: transparent;
+}

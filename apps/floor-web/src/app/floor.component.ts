@@ -57,6 +57,50 @@ const CALL_LABELS: Record<string, string> = {
         </div>
       </header>
 
+      <!-- Qué está viendo y por qué.
+           Sin esto el salón filtraba en silencio: "nadie está llamando" no
+           distinguía entre un salón tranquilo y una pantalla recortada. -->
+      @if (store.misMesas().length > 0 || store.enTurno()) {
+        <section class="shift" [class.on]="store.enTurno()">
+          <div class="shift-info">
+            @if (store.enTurno()) {
+              <span class="shift-state">En turno</span>
+              @if (store.viendoTodo()) {
+                <span class="shift-tables">Estás viendo todo el salón</span>
+              } @else if (store.misMesas().length > 0) {
+                <span class="shift-tables">
+                  Tus mesas:
+                  @for (id of store.misMesas(); track id) {
+                    <span class="shift-table">{{ tableNumber(id) }}</span>
+                  }
+                </span>
+              } @else {
+                <span class="shift-tables">Todavía no te asignaron mesas</span>
+              }
+            } @else {
+              <span class="shift-state off">Estás viendo todo el salón</span>
+              <span class="shift-tables">
+                Tu sector:
+                @for (id of store.misMesas(); track id) {
+                  <span class="shift-table">{{ tableNumber(id) }}</span>
+                }
+              </span>
+            }
+          </div>
+
+          <div class="shift-actions">
+            @if (store.enTurno()) {
+              <button type="button" class="shift-toggle" (click)="store.viendoTodo.set(!store.viendoTodo())">
+                {{ store.viendoTodo() ? 'Ver solo lo mío' : 'Ver todo el salón' }}
+              </button>
+            }
+            <button type="button" class="shift-btn" (click)="toggleShift()">
+              {{ store.enTurno() ? 'Salgo' : 'Entro al turno' }}
+            </button>
+          </div>
+        </section>
+      }
+
       <!-- Cobrar y liberar se hacían en silencio si el servidor rechazaba: el
            mozo tocaba, no pasaba nada, y no sabía si el toque había entrado. -->
       @if (store.actionError(); as problema) {
@@ -323,6 +367,10 @@ export class FloorComponent implements OnDestroy {
    * hay que leer con la bandeja en la mano.
    */
   protected readonly confirming = signal<string | null>(null);
+
+  protected async toggleShift(): Promise<void> {
+    await this.store.toggleShift();
+  }
 
   protected async release(sessionId: string): Promise<void> {
     this.confirming.set(null);

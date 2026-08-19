@@ -540,3 +540,112 @@
   font-size: 0.8rem;
   cursor: pointer;
 }
+
+/*
+ * Qué está viendo el mozo, y cómo cambiarlo.
+ *
+ * Antes el salón filtraba en silencio: "nadie está llamando" no distinguía
+ * entre un salón tranquilo y una pantalla recortada por el sector.
+ */
+.shift {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-card);
+  background: var(--itadaki-surface-raised);
+}
+
+/* En turno se ve distinto: es el estado en el que la pantalla está recortada. */
+.shift.on {
+  border-color: var(--itadaki-status-ready);
+  background: var(--itadaki-status-ready-bg);
+}
+
+.shift-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.shift-state {
+  font-family: var(--itadaki-font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--itadaki-status-ready-fg);
+}
+
+.shift-state.off {
+  color: var(--itadaki-ink-subtle);
+}
+
+.shift-tables {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--itadaki-ink-soft);
+}
+
+/* El número del cartelito, que es como el mozo llama a la mesa. */
+.shift-table {
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-surface);
+  font-weight: 700;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.shift-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.shift-btn {
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-ink-strong);
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.shift-toggle {
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--itadaki-border);
+  border-radius: var(--itadaki-radius-pill);
+  background: transparent;
+  color: var(--itadaki-ink-soft);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+@media (max-width: 560px) {
+  .shift-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .shift-btn,
+  .shift-toggle {
+    flex: 1;
+  }
+}

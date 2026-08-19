@@ -9,9 +9,9 @@ import {
   Post,
 } from '@nestjs/common';
 import { PostgresTableStore, signTableToken } from '@itadaki/identity/infra';
-import { PostgresAssignmentStore } from '@itadaki/ordering/infra';
+import { PostgresAssignmentStore, PostgresShiftStore } from '@itadaki/ordering/infra';
 import { z } from 'zod';
-import { RequirePermission, TenantId } from './auth';
+import { Auth, RequirePermission, TenantId, type AuthContext } from './auth';
 import { database } from './database';
 
 const DINER_APP_URL = process.env['DINER_APP_URL'] ?? 'http://localhost:4200';
@@ -20,6 +20,7 @@ const DINER_APP_URL = process.env['DINER_APP_URL'] ?? 'http://localhost:4200';
 export class TablesController {
   private readonly tables = new PostgresTableStore(database);
   private readonly assignments = new PostgresAssignmentStore(database);
+  private readonly shifts = new PostgresShiftStore(database);
 
   /** Lists tables with a freshly minted QR link for each. */
   @RequirePermission('menu:read')
@@ -148,6 +149,55 @@ export class TablesController {
       throw new HttpException(done.error, HttpStatus.BAD_GATEWAY);
     }
     return { tableId, staffId: null };
+  }
+
+
+  /**
+   * Quién está trabajando ahora.
+   *
+   * Lo lee el salón para saber si esconder las mesas de los demás, y el panel
+   * para mostrar quién entró. Pide `orders:read` porque es información del
+   * turno, no una configuración.
+   */
+  @RequirePermission('orders:read')
+  @Get('shifts')
+  async listShifts(@TenantId() tenantId: string) {
+    const found = await this.shifts.list(tenantId);
+    if (found.isErr()) {
+      throw new HttpException(found.error, HttpStatus.BAD_GATEWAY);
+    }
+    return found.value.map((shift) => ({
+      staffId: shift.staffId,
+      lastSeen: shift.lastSeen.toISOString(),
+    }));
+  }
+
+  /**
+   * Entrar al turno, o renovarlo.
+   *
+   * Cada uno entra por su cuenta y no lo carga el encargado: quién trabaja hoy
+   * lo sabe el mozo, y el encargado puede no estar. Sobre el usuario del token
+   * y no sobre un id que venga en el cuerpo — nadie pone a otro en turno.
+   */
+  @RequirePermission('orders:read')
+  @Post('shifts/enter')
+  async enterShift(@TenantId() tenantId: string, @Auth() user: AuthContext) {
+    const done = await this.shifts.enter(tenantId, user.userId);
+    if (done.isErr()) {
+      throw new HttpException(done.error, HttpStatus.BAD_GATEWAY);
+    }
+    return { staffId: user.userId, inShift: true };
+  }
+
+  /** Salir del turno: sus mesas vuelven a verlas todos. */
+  @RequirePermission('orders:read')
+  @Post('shifts/leave')
+  async leaveShift(@TenantId() tenantId: string, @Auth() user: AuthContext) {
+    const done = await this.shifts.leave(tenantId, user.userId);
+    if (done.isErr()) {
+      throw new HttpException(done.error, HttpStatus.BAD_GATEWAY);
+    }
+    return { staffId: user.userId, inShift: false };
   }
 
 }

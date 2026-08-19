@@ -2,7 +2,12 @@ import { apiUrl, socketUrl } from '@itadaki/shared/domain';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { AuthStore } from '@itadaki/shared/ui-auth';
 import { OutboxDb } from '@itadaki/shared/offline';
-import { type TableAssignment, canSeeTable } from '@itadaki/ordering/domain';
+import {
+  type Shift,
+  type TableAssignment,
+  filtersBySector,
+  hiddenFrom,
+} from '@itadaki/ordering/domain';
 import { io, type Socket } from 'socket.io-client';
 
 const API = apiUrl();
@@ -135,9 +140,64 @@ export class FloorStore {
    */
   readonly assignments = signal<readonly TableAssignment[]>([]);
 
-  /** Si esta mesa le toca a quien está mirando la pantalla. */
-  readonly esMia = (tableId: string): boolean =>
-    canSeeTable(this.auth.profile()?.id ?? '', tableId, this.assignments());
+  /** Quién está trabajando ahora. */
+  readonly shifts = signal<readonly Shift[]>([]);
+
+  /** Si quiere ver el salón entero por un rato, para cubrir a alguien. */
+  readonly viendoTodo = signal(false);
+
+  /** Si esta persona entró al turno. */
+  readonly enTurno = computed(() =>
+    filtersBySector(this.auth.profile()?.id ?? '', this.shifts(), new Date()),
+  );
+
+  /** Las mesas de su sector, por su nombre, para decirlo en el encabezado. */
+  readonly misMesas = computed(() => {
+    const yo = this.auth.profile()?.id ?? '';
+    return this.assignments()
+      .filter((a) => a.staffId === yo)
+      .map((a) => a.tableId);
+  });
+
+  /**
+   * Si esta mesa entra en su pantalla.
+   *
+   * Se esconde sólo la de un compañero que está en turno. La de quien todavía
+   * no entró —o ya se fue— la ve todo el mundo: nadie la está atendiendo, así
+   * que esconderla la dejaría sin nadie encima.
+   */
+  readonly esMia = (tableId: string): boolean => {
+    if (this.viendoTodo()) return true;
+
+    const dueno = this.assignments().find((a) => a.tableId === tableId)?.staffId ?? null;
+    return !hiddenFrom(this.auth.profile()?.id ?? '', dueno, this.shifts(), new Date());
+  };
+
+  /** Entra al turno, o sale. Cada uno el suyo: nadie pone a otro en turno. */
+  async toggleShift(): Promise<void> {
+    const entrando = !this.enTurno();
+    this.actionError.set(null);
+
+    try {
+      const response = await fetch(`${API}/tables/shifts/${entrando ? 'enter' : 'leave'}`, {
+        method: 'POST',
+        headers: { ...this.auth.headers(), 'Content-Type': 'application/json' },
+      });
+      if (this.auth.expired(response)) return;
+
+      if (!response.ok) {
+        this.actionError.set('No se pudo cambiar el turno. Probá de nuevo.');
+        return;
+      }
+
+      // Al entrar se vuelve al sector propio: pedir el turno y seguir viendo
+      // todo dejaría el botón sin efecto visible.
+      if (entrando) this.viendoTodo.set(false);
+      await this.refresh();
+    } catch {
+      this.actionError.set('Sin conexión — no se pudo cambiar el turno');
+    }
+  }
 
   /**
    * Lo que el mozo tiene que atender, sin las mesas de sus compañeros.
@@ -261,12 +321,13 @@ export class FloorStore {
 
   async refresh(): Promise<void> {
     try {
-      const [calls, orders, unsettled, codes, assignments] = await Promise.all([
+      const [calls, orders, unsettled, codes, assignments, shifts] = await Promise.all([
         fetch(`${API}/calls`, { headers: this.auth.headers() }),
         fetch(`${API}/orders`, { headers: this.auth.headers() }),
         fetch(`${API}/sessions/unsettled`, { headers: this.auth.headers() }),
         fetch(`${API}/sessions/codes`, { headers: this.auth.headers() }),
         fetch(`${API}/tables/assignments`, { headers: this.auth.headers() }),
+        fetch(`${API}/tables/shifts`, { headers: this.auth.headers() }),
       ]);
 
       // A shift long enough to outlive the session ends here rather than
@@ -279,6 +340,10 @@ export class FloorStore {
       if (codes.ok) this.tableCodes.set((await codes.json()) as TableCodeDto[]);
       if (assignments.ok) {
         this.assignments.set((await assignments.json()) as TableAssignment[]);
+      }
+      if (shifts.ok) {
+        const filas = (await shifts.json()) as Array<{ staffId: string; lastSeen: string }>;
+        this.shifts.set(filas.map((f) => ({ staffId: f.staffId, lastSeen: new Date(f.lastSeen) })));
       }
     } catch {
       // Keep the last known room; the next event or reconnect retries.

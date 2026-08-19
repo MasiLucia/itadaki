@@ -407,24 +407,6 @@ const ROLE_NAMES: Record<string, string> = {
                   <span class="table-seats">{{ table.seats }} lugares</span>
                 </div>
 
-                <!-- Quién atiende esta mesa. Sin nadie elegido la ve todo el
-                     salón, que es lo correcto en un local que no reparte. -->
-                @if (waiters().length > 0) {
-                  <label class="table-assign">
-                    <span class="table-assign-label">Atiende</span>
-                    <select
-                      class="table-assign-select"
-                      [value]="assignedTo(table.id)"
-                      (change)="onAssign(table.id, $event)"
-                    >
-                      <option value="">Todo el salón</option>
-                      @for (mozo of waiters(); track mozo.id) {
-                        <option [value]="mozo.id">{{ mozo.displayName }}</option>
-                      }
-                    </select>
-                  </label>
-                }
-
                 <div class="table-actions">
                   <button type="button" class="table-copy" (click)="copyLink(table)">
                     {{ copied() === table.id ? '¡Copiado!' : 'Copiar link' }}
@@ -463,6 +445,75 @@ const ROLE_NAMES: Record<string, string> = {
         </details>
 
       </section>
+
+      @if (auth.can('staff:manage') && waiters().length > 0) {
+        <section class="panel">
+          <h2 class="panel-title">Reparto del salón</h2>
+          <p class="panel-lede">
+            El sector habitual de cada uno. Se carga una vez: cuando el mozo
+            entra al turno desde su app, ve solamente estas mesas. Las de quien
+            hoy no vino las siguen viendo todos.
+          </p>
+
+          @if (orphaned().length > 0) {
+            <p class="orphan-warn" role="alert">
+              <strong>
+                {{ orphaned().length === 1 ? 'Una mesa quedó' : orphaned().length + ' mesas quedaron' }}
+                sin mozo.
+              </strong>
+              @for (id of orphaned(); track id) {
+                <span class="orphan-table">{{ tableLabel(id) }}</span>
+              }
+              <span class="orphan-why">
+                {{ orphaned().length === 1 ? 'Está' : 'Están' }} asignadas a alguien que ya no
+                trabaja acá. Pasalas a otro abajo, o dejalas sin asignar.
+              </span>
+            </p>
+          }
+
+          <!-- Todo el reparto de un vistazo: con un desplegable por fila hacía
+               falta abrir veinte menús para ver quién tenía qué. -->
+          <div class="sectors">
+            @for (mozo of waiters(); track mozo.id) {
+              <div class="sector">
+                <p class="sector-head">
+                  <span class="sector-name">{{ mozo.displayName }}</span>
+                  <span class="sector-count">{{ tablesOf(mozo.id).length }}</span>
+                </p>
+                <div class="sector-tables">
+                  @for (table of tables(); track table.id) {
+                    <button
+                      type="button"
+                      class="sector-chip"
+                      [class.on]="assignedTo(table.id) === mozo.id"
+                      (click)="toggleTable(table.id, mozo.id)"
+                    >
+                      {{ table.label }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+
+            <div class="sector free">
+              <p class="sector-head">
+                <span class="sector-name">Sin asignar</span>
+                <span class="sector-count">{{ unassigned().length }}</span>
+              </p>
+              <p class="sector-hint">Las ve todo el salón.</p>
+              <div class="sector-tables">
+                @for (id of unassigned(); track id) {
+                  <span class="sector-chip idle">{{ tableLabel(id) }}</span>
+                }
+              </div>
+            </div>
+          </div>
+
+          @if (staffError(); as message) {
+            <p class="error-note" role="alert">{{ message }}</p>
+          }
+        </section>
+      }
 
       @if (auth.can('staff:manage')) {
         <section class="panel">
@@ -1375,9 +1426,31 @@ export class AdminComponent {
     });
   }
 
-  /** Lo elegido en el desplegable de una mesa. */
-  protected onAssign(tableId: string, event: Event): void {
-    void this.assignTable(tableId, (event.target as HTMLSelectElement).value);
+  /** Las mesas de un mozo, para contarlas al lado de su nombre. */
+  protected tablesOf(staffId: string): readonly string[] {
+    return this.assignments()
+      .filter((a) => a.staffId === staffId)
+      .map((a) => a.tableId);
+  }
+
+  /** Las que no son de nadie: las ve todo el salón. */
+  protected readonly unassigned = computed(() => {
+    const repartidas = new Set(this.assignments().map((a) => a.tableId));
+    return this.tables()
+      .filter((table) => !repartidas.has(table.id))
+      .map((table) => table.id);
+  });
+
+  /**
+   * Un toque pone la mesa en ese sector; otro se la saca.
+   *
+   * Tocar una mesa que ya es de otro se la pasa directamente, sin obligar a
+   * quitarla primero: repartir el salón es mover mesas entre columnas, no un
+   * trámite de dos pasos.
+   */
+  protected toggleTable(tableId: string, staffId: string): void {
+    const actual = this.assignedTo(tableId);
+    void this.assignTable(tableId, actual === staffId ? '' : staffId);
   }
 
   protected async inviteStaff(event: Event): Promise<void> {
