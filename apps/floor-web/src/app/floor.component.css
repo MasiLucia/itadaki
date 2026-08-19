@@ -300,10 +300,17 @@
   gap: 0.5rem;
 }
 
+/*
+ * El toque que libera plata sin cobrarla.
+ *
+ * Estaba pintado con un token que no existe, así que quedaba con fondo
+ * transparente y letras blancas: invisible sobre la tarjeta blanca. El único
+ * botón de la pantalla que perdona una deuda era el que no se veía.
+ */
 .owing-card .release.confirm {
   background: var(--itadaki-status-late);
   color: white;
-  border: none;
+  border: 1px solid var(--itadaki-status-late);
   border-radius: var(--itadaki-radius-pill);
   padding: 0.6rem 1rem;
   font-family: var(--itadaki-font-display);

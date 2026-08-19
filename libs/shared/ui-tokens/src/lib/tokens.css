@@ -34,6 +34,18 @@
   --itadaki-status-ready: oklch(65% 0.15 150);
   --itadaki-status-ready-bg: oklch(90% 0.1 150 / 0.3);
   --itadaki-status-ready-fg: oklch(40% 0.1 150);
+  /*
+   * Se pasó del tiempo, o hay plata sin cobrar.
+   *
+   * Faltaba, y cuatro pantallas ya lo usaban: la comanda atrasada en cocina,
+   * el borde y el contador de las mesas impagas, y el botón de liberar sin
+   * cobrar. Sin definirlo, `background: var(--itadaki-status-late)` no pinta
+   * nada — el botón quedaba con letras blancas sobre la tarjeta blanca.
+   *
+   * Rojo más oscuro y saturado que el acento, para que se separe del
+   * terracota de marca: esto no es una acción, es una alarma.
+   */
+  --itadaki-status-late: oklch(52% 0.20 25);
   --itadaki-live: oklch(72% 0.16 150);
 
   /* Decorative blobs on the landing surface */
