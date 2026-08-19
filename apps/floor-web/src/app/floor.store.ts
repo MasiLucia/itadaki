@@ -143,6 +143,16 @@ export class FloorStore {
   /** Quién está trabajando ahora. */
   readonly shifts = signal<readonly Shift[]>([]);
 
+  /**
+   * Los nombres de quienes están en turno.
+   *
+   * Aparte de `shifts` porque la regla de dominio trabaja con ids: el nombre
+   * es para la pantalla, que tiene que decir quién entró — un id no le dice
+   * nada a nadie, y sin esto el mozo no sabía con quién estaba compartiendo
+   * el salón.
+   */
+  readonly onShift = signal<readonly { staffId: string; displayName: string }[]>([]);
+
   /** Si quiere ver el salón entero por un rato, para cubrir a alguien. */
   readonly viendoTodo = signal(false);
 
@@ -342,8 +352,15 @@ export class FloorStore {
         this.assignments.set((await assignments.json()) as TableAssignment[]);
       }
       if (shifts.ok) {
-        const filas = (await shifts.json()) as Array<{ staffId: string; lastSeen: string }>;
+        const filas = (await shifts.json()) as Array<{
+          staffId: string;
+          displayName: string;
+          lastSeen: string;
+        }>;
         this.shifts.set(filas.map((f) => ({ staffId: f.staffId, lastSeen: new Date(f.lastSeen) })));
+        this.onShift.set(
+          filas.map((f) => ({ staffId: f.staffId, displayName: f.displayName ?? f.staffId })),
+        );
       }
     } catch {
       // Keep the last known room; the next event or reconnect retries.

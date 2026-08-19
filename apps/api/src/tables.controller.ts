@@ -9,7 +9,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { PostgresTableStore, signTableToken } from '@itadaki/identity/infra';
+import { PostgresStaffStore, PostgresTableStore, signTableToken } from '@itadaki/identity/infra';
 import { PostgresAssignmentStore, PostgresShiftStore } from '@itadaki/ordering/infra';
 import { z } from 'zod';
 import { Auth, RequirePermission, TenantId, type AuthContext } from './auth';
@@ -22,6 +22,7 @@ export class TablesController {
   private readonly tables = new PostgresTableStore(database);
   private readonly assignments = new PostgresAssignmentStore(database);
   private readonly shifts = new PostgresShiftStore(database);
+  private readonly staff = new PostgresStaffStore(database);
 
   /** Lists tables with a freshly minted QR link for each. */
   @RequirePermission('menu:read')
@@ -169,8 +170,16 @@ export class TablesController {
     if (found.isErr()) {
       throw new HttpException(found.error, HttpStatus.BAD_GATEWAY);
     }
+    // Con el nombre, no sólo el id: la pantalla del salón muestra quién entró
+    // al turno, y "d2c51e24-..." no le dice nada a nadie.
+    const equipo = await this.staff.listForTenant(tenantId);
+    const nombres = new Map(
+      equipo.isOk() ? equipo.value.map((member) => [member.id, member.displayName]) : [],
+    );
+
     return found.value.map((shift) => ({
       staffId: shift.staffId,
+      displayName: nombres.get(shift.staffId) ?? shift.staffId,
       lastSeen: shift.lastSeen.toISOString(),
     }));
   }

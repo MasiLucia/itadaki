@@ -88,6 +88,17 @@ const CALL_LABELS: Record<string, string> = {
             }
           </div>
 
+          @if (store.onShift().length > 0) {
+            <p class="shift-who">
+              <span class="shift-who-label">En el salón</span>
+              @for (persona of store.onShift(); track persona.staffId) {
+                <span class="shift-person" [class.me]="persona.staffId === myId()">
+                  {{ persona.displayName }}
+                </span>
+              }
+            </p>
+          }
+
           <div class="shift-actions">
             @if (store.enTurno()) {
               <button type="button" class="shift-toggle" (click)="store.viendoTodo.set(!store.viendoTodo())">
@@ -112,15 +123,26 @@ const CALL_LABELS: Record<string, string> = {
         </p>
       }
 
-      <!-- Calls first: a person is waiting, which outranks a plate on the pass. -->
+      <!-- Calls first: a person is waiting, which outranks a plate on the pass.
+           Se pliega como el resto, pero arranca abierto cuando hay alguien
+           esperando: una persona levantando la mano no puede quedar detrás de
+           un toque. -->
       <section class="block" aria-labelledby="calls-title">
-        <h2 class="block-title" id="calls-title">
-          Te están llamando
+        <button
+          type="button"
+          class="cooking-toggle"
+          id="calls-title"
+          [attr.aria-expanded]="showCalls()"
+          (click)="showCalls.set(!showCalls())"
+        >
+          <span class="block-title as-toggle">Te están llamando</span>
           @if (store.misLlamados().length > 0) {
             <span class="count">{{ store.misLlamados().length }}</span>
           }
-        </h2>
+          <span class="cooking-chevron">{{ showCalls() ? '−' : '+' }}</span>
+        </button>
 
+        @if (showCalls()) {
         @for (call of store.misLlamados(); track call.id) {
           <article class="card call">
             <div class="card-main">
@@ -148,6 +170,7 @@ const CALL_LABELS: Record<string, string> = {
           </article>
         } @empty {
           <p class="quiet">Nadie está llamando ahora.</p>
+        }
         }
       </section>
 
@@ -218,53 +241,24 @@ const CALL_LABELS: Record<string, string> = {
         </section>
       }
 
-      <!-- El código que el mozo le dice a la mesa al sentarla. Todas las mesas,
-           no sólo las ocupadas: hace falta justo antes de que la mesa exista.
-           Plegado, porque se consulta al sentar y no durante todo el turno. -->
-      @if (store.tableCodes().length > 0) {
-        <section class="block" aria-labelledby="codes-title">
-          <button
-            type="button"
-            class="cooking-toggle"
-            id="codes-title"
-            [attr.aria-expanded]="showCodes()"
-            (click)="showCodes.set(!showCodes())"
-          >
-            <span class="quiet-title">Códigos de mesa</span>
-            <span class="cooking-count">{{ store.tableCodes().length }} mesas</span>
-            <span class="cooking-chevron">{{ showCodes() ? '−' : '+' }}</span>
-          </button>
-
-          @if (showCodes()) {
-            <p class="quiet">
-              Decíselo a la mesa al sentarla. Se renueva solo cuando la liberás.
-            </p>
-            @for (mesa of store.tableCodes(); track mesa.tableId) {
-              <p class="cooking-row">
-                <span class="table small">Mesa {{ tableNumber(mesa.tableId) }}</span>
-                <span class="cooking-items">
-                  {{ mesa.diners > 0 ? mesa.diners + ' sentados' : 'libre' }}
-                </span>
-                <span class="join-code">{{ mesa.joinCode ?? 'sin código' }}</span>
-                <!-- Para cuando se filtró: lo escucharon de la mesa de al lado
-                     o quedó anotado en una servilleta que se llevaron. -->
-                <button type="button" class="release" (click)="rotate(mesa.tableId)">
-                  Renovar
-                </button>
-              </p>
-            }
-          }
-        </section>
-      }
 
       <!-- Then the pass: dishes the kitchen has finished and nobody has carried. -->
       <section class="block" aria-labelledby="pickup-title">
-        <h2 class="block-title" id="pickup-title">
-          Listo para llevar
+        <button
+          type="button"
+          class="cooking-toggle"
+          id="pickup-title"
+          [attr.aria-expanded]="showPickups()"
+          (click)="showPickups.set(!showPickups())"
+        >
+          <span class="block-title as-toggle">Listo para llevar</span>
           @if (store.pickups().length > 0) {
             <span class="count ready">{{ store.pickups().length }}</span>
           }
-        </h2>
+          <span class="cooking-chevron">{{ showPickups() ? '−' : '+' }}</span>
+        </button>
+
+        @if (showPickups()) {
 
         <!-- Una tarjeta por mesa, no por plato: es un viaje. Antes una mesa
              con cuatro platos listos ocupaba cuatro filas seguidas y el mozo
@@ -296,6 +290,7 @@ const CALL_LABELS: Record<string, string> = {
           </article>
         } @empty {
           <p class="quiet">Nada esperando en la barra.</p>
+        }
         }
       </section>
 
@@ -346,6 +341,45 @@ const CALL_LABELS: Record<string, string> = {
           }
         </section>
       }
+
+      <!-- El código que el mozo le dice a la mesa al sentarla. Todas las mesas,
+           no sólo las ocupadas: hace falta justo antes de que la mesa exista.
+           Plegado, porque se consulta al sentar y no durante todo el turno. -->
+      @if (store.tableCodes().length > 0) {
+        <section class="block" aria-labelledby="codes-title">
+          <button
+            type="button"
+            class="cooking-toggle"
+            id="codes-title"
+            [attr.aria-expanded]="showCodes()"
+            (click)="showCodes.set(!showCodes())"
+          >
+            <span class="quiet-title">Códigos de mesa</span>
+            <span class="cooking-count">{{ store.tableCodes().length }} mesas</span>
+            <span class="cooking-chevron">{{ showCodes() ? '−' : '+' }}</span>
+          </button>
+
+          @if (showCodes()) {
+            <p class="quiet">
+              Decíselo a la mesa al sentarla. Se renueva solo cuando la liberás.
+            </p>
+            @for (mesa of store.tableCodes(); track mesa.tableId) {
+              <p class="cooking-row">
+                <span class="table small">Mesa {{ tableNumber(mesa.tableId) }}</span>
+                <span class="cooking-items">
+                  {{ mesa.diners > 0 ? mesa.diners + ' sentados' : 'libre' }}
+                </span>
+                <span class="join-code">{{ mesa.joinCode ?? 'sin código' }}</span>
+                <!-- Para cuando se filtró: lo escucharon de la mesa de al lado
+                     o quedó anotado en una servilleta que se llevaron. -->
+                <button type="button" class="release" (click)="rotate(mesa.tableId)">
+                  Renovar
+                </button>
+              </p>
+            }
+          }
+        </section>
+      }
     }
   `,
 })
@@ -367,6 +401,20 @@ export class FloorComponent implements OnDestroy {
    * hay que leer con la bandeja en la mano.
    */
   protected readonly confirming = signal<string | null>(null);
+
+  /** Quién soy, para marcarme entre los que están en el salón. */
+  /**
+   * Abiertos por defecto: son las dos cosas que el mozo viene a hacer.
+   *
+   * Se pliegan igual, para que quien tiene el salón tranquilo pueda dejar la
+   * pantalla en los códigos sin scrollear.
+   */
+  protected readonly showCalls = signal(true);
+  protected readonly showPickups = signal(true);
+
+  protected myId(): string {
+    return this.auth.profile()?.id ?? '';
+  }
 
   protected async toggleShift(): Promise<void> {
     await this.store.toggleShift();

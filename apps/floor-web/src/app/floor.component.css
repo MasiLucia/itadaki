@@ -649,3 +649,48 @@
     flex: 1;
   }
 }
+
+/* El título cuando además es el botón que pliega la sección. */
+.block-title.as-toggle {
+  margin: 0;
+  text-align: left;
+}
+
+/*
+ * Quién más está en el salón.
+ *
+ * Sin esto, entrar al turno era un acto a ciegas: nadie sabía si su compañero
+ * ya había entrado, y por lo tanto si las mesas que no ve las está mirando
+ * alguien o no las mira nadie.
+ */
+.shift-who {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.5rem 0 0;
+  flex-basis: 100%;
+}
+
+.shift-who-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--itadaki-ink-subtle);
+}
+
+.shift-person {
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--itadaki-radius-pill);
+  background: var(--itadaki-surface-sunken);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--itadaki-ink-soft);
+}
+
+/* El propio nombre, marcado: se busca primero en la lista. */
+.shift-person.me {
+  background: var(--itadaki-status-ready);
+  color: white;
+}
