@@ -162,28 +162,6 @@ const ROLE_NAMES: Record<string, string> = {
       }
     }
 
-    <!-- Only while something is genuinely missing: a checklist that never goes
-         away stops being guidance and becomes clutter. -->
-    @if (setupSteps().length > 0) {
-      <section class="setup" aria-labelledby="setup-title">
-        <h2 class="setup-title" id="setup-title">Para empezar</h2>
-        <p class="setup-lede">
-          Tres pasos y tu carta ya funciona en las mesas.
-        </p>
-        <ol class="setup-steps">
-          @for (step of setupSteps(); track step.id) {
-            <li class="setup-step" [class.done]="step.done">
-              <span class="setup-mark" aria-hidden="true">{{ step.done ? '✓' : step.n }}</span>
-              <span class="setup-text">
-                <span class="setup-name">{{ step.title }}</span>
-                <span class="setup-hint">{{ step.hint }}</span>
-              </span>
-            </li>
-          }
-        </ol>
-      </section>
-    }
-
     <div class="layout" [attr.data-tab]="activeTab()">
 
       <!-- Tu carta: los platos y cómo se organizan. -->
@@ -1306,34 +1284,6 @@ export class AdminComponent {
    * than new. The list disappears on its own once the three things that make
    * the app usable exist, so nobody has to dismiss it.
    */
-  protected readonly setupSteps = computed(() => {
-    const steps = [
-      {
-        id: 'categories',
-        n: 1,
-        title: 'Creá tus categorías',
-        hint: 'Entradas, principales, postres… las secciones de tu carta.',
-        done: this.categories().length > 0,
-      },
-      {
-        id: 'products',
-        n: 2,
-        title: 'Cargá tus platos',
-        hint: 'Con nombre y precio ya alcanza; las fotos podés sumarlas después.',
-        done: this.products().length > 0,
-      },
-      {
-        id: 'tables',
-        n: 3,
-        title: 'Sumá tus mesas e imprimí los QR',
-        hint: 'Cada mesa tiene su código; se imprimen todos juntos.',
-        done: this.tables().length > 0,
-      },
-    ];
-
-    return steps.every((step) => step.done) ? [] : steps;
-  });
-
   protected readonly priceSaved = signal(false);
 
   /** The selected dish's price in pesos, for the editable field. */
