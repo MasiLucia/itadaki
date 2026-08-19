@@ -88,3 +88,11 @@ export {
   seesEveryTable,
   tablesFor,
 } from './lib/table-assignment';
+export {
+  type Shift,
+  SHIFT_IDLE_MS,
+  activeShifts,
+  filtersBySector,
+  hiddenFrom,
+  isActive,
+} from './lib/shift';
